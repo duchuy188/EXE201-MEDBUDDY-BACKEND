@@ -1,0 +1,1 @@
+// Swagger schema for user
