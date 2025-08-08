@@ -9,12 +9,16 @@
  *       properties:
  *         _id:
  *           type: string
- *         name:
+ *         fullName:
  *           type: string
  *         email:
  *           type: string
+ *         phoneNumber:
+ *           type: string
+ *         password:
+ *           type: string
  *         role:
  *           type: string
- *           enum: [user, admin]
+ *           enum: [relative, patient]
  */
 module.exports = {};
