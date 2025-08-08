@@ -7,17 +7,17 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
 // Kết nối MongoDB
-const connectDB = require('./config/database');
+const connectDB = require('./src/config/database');
 connectDB();
 
 // Swagger
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
-const swaggerOptions = require('./config/swagger/swagger');
+const swaggerOptions = require('./src/config/swagger/swagger');
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+var indexRouter = require('./src/routes/index');
+var usersRouter = require('./src/routes/users');
 
 var app = express();
 
