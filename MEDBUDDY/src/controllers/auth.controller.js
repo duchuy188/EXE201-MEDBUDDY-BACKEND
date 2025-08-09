@@ -48,9 +48,9 @@ exports.register = async (req, res) => {
     if (!['relative', 'patient'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role.' });
     }
-    const existingUser = await User.findOne({ $or: [{ email }, { phoneNumber }] });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'Email or phone number already exists.' });
+      return res.status(400).json({ message: 'Email already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ fullName, email, phoneNumber, password: hashedPassword, role, dateOfBirth });
