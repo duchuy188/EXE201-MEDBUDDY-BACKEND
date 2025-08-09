@@ -2,6 +2,12 @@ var express = require('express');
 var router = express.Router();
 
 const usersRouter = require('./users');
+const medicationsRouter = require('./medications');
+const remindersRouter = require('./reminders');
+const bloodPressureRouter = require('./bloodPressure');
+const notificationsRouter = require('./notifications');
+const alertsRouter = require('./alerts');
+const medicationHistoryRouter = require('./medicationsHistory');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -9,6 +15,26 @@ router.get('/', function(req, res, next) {
 });
 
 // User routes
+
+// User routes
 router.use('/users', usersRouter);
+
+// Medication routes
+router.use('/medications', medicationsRouter);
+
+// Reminder routes
+router.use('/reminders', remindersRouter);
+
+// Blood Pressure routes
+router.use('/blood-pressure', bloodPressureRouter);
+
+// Notification routes
+router.use('/notifications', notificationsRouter);
+
+// Alert routes
+router.use('/alerts', alertsRouter);
+
+// Medication history routes
+router.use('/medication-history', medicationHistoryRouter);
 
 module.exports = router;
