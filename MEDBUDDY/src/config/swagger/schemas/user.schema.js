@@ -20,5 +20,9 @@
  *         role:
  *           type: string
  *           enum: [relative, patient]
+ *         dateOfBirth:
+ *           type: string
+ *           format: date
+ *           example: "1990-01-15"
  */
 module.exports = {};

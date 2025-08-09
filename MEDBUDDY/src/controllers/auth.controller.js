@@ -30,7 +30,8 @@ exports.login = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phoneNumber: user.phoneNumber,
-        role: user.role
+        role: user.role,
+        dateOfBirth: user.dateOfBirth
       }
     });
   } catch (error) {
@@ -40,8 +41,8 @@ exports.login = async (req, res) => {
 
 exports.register = async (req, res) => {
   try {
-    const { fullName, email, phoneNumber, password, role } = req.body;
-    if (!fullName || !email || !phoneNumber || !password || !role) {
+    const { fullName, email, phoneNumber, password, role, dateOfBirth } = req.body;
+    if (!fullName || !email || !phoneNumber || !password || !role || !dateOfBirth) {
       return res.status(400).json({ message: 'Please provide all required fields.' });
     }
     if (!['relative', 'patient'].includes(role)) {
@@ -52,7 +53,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'Email or phone number already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ fullName, email, phoneNumber, password: hashedPassword, role });
+    const user = new User({ fullName, email, phoneNumber, password: hashedPassword, role, dateOfBirth });
     await user.save();
     res.status(201).json({ message: 'Registration successful!' });
   } catch (error) {

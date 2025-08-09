@@ -1,4 +1,3 @@
-
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const { uploadImage } = require("../services/uploadService");
@@ -20,7 +19,7 @@ exports.updateProfile = async (req, res) => {
     return res.status(400).json({ message: "Thiếu dữ liệu gửi lên" });
   }
 
-  const { name, email, phone, password, ...otherFields } = req.body;
+  const { fullName, email, phoneNumber, password, dateOfBirth, ...otherFields } = req.body;
   const avatarFile = req.file; // Lấy file avatar từ multer
 
   // Không cho phép sửa role
@@ -33,7 +32,7 @@ exports.updateProfile = async (req, res) => {
   // Không cho phép sửa các field khác không được định nghĩa
   if (Object.keys(otherFields).length > 0) {
     return res.status(400).json({
-      message: "Chỉ được cập nhật name, email, phone, password, avatar",
+      message: "Chỉ được cập nhật fullName, email, phoneNumber, password, dateOfBirth, avatar",
     });
   }
 
@@ -41,9 +40,10 @@ exports.updateProfile = async (req, res) => {
     const updateFields = {};
 
     // Chỉ cập nhật các field được phép
-    if (name !== undefined) updateFields.name = name;
+    if (fullName !== undefined) updateFields.fullName = fullName;
     if (email !== undefined) updateFields.email = email;
-    if (phone !== undefined) updateFields.phone = phone;
+    if (phoneNumber !== undefined) updateFields.phoneNumber = phoneNumber;
+    if (dateOfBirth !== undefined) updateFields.dateOfBirth = dateOfBirth;
     if (password !== undefined) {
       updateFields.password = await bcrypt.hash(password, 10);
     }
@@ -63,7 +63,7 @@ exports.updateProfile = async (req, res) => {
     if (email) {
       const existingUser = await User.findOne({
         email,
-        _id: { $ne: req.user.userId },
+        _id: { $ne: req.user._id },
       });
       if (existingUser) {
         return res.status(400).json({ message: "Email đã tồn tại" });
@@ -116,7 +116,7 @@ exports.changePassword = async (req, res) => {
 
   try {
     // Lấy thông tin user hiện tại (bao gồm password đã hash)
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }

@@ -27,6 +27,10 @@ const userSchema = new mongoose.Schema({
     enum: ['relative', 'patient', 'admin'],
     required: true,
   },
+  dateOfBirth: {
+    type: Date,
+    required: true,
+  },
   avatar: {
     type: String,
     default: '', // Link ảnh đại diện
