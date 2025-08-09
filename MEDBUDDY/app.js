@@ -31,37 +31,14 @@ var remindersRouter = require('./src/routes/reminders');
 
 var app = express();
 
-// CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Cho phép requests từ localhost (development), React Native và production domains
-    const allowedOrigins = [
-      'http://localhost:3000',      // React development server
-      'http://localhost:3001',      // Alternative React port
-      'http://localhost:19006',     // Expo development server
-      'exp://192.168.1.100:19000',  // Expo client (thay đổi IP theo máy của bạn)
-      'exp://localhost:19000',      // Expo localhost
-      undefined                     // React Native không gửi origin
-    ];
-    
-    // Trong development, cho phép tất cả origins
-    if (process.env.NODE_ENV === 'development' || !origin) {
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+// CORS configuration - Simplified for development
+app.use(cors({
+  origin: true,  // Cho phép tất cả origins trong development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  optionsSuccessStatus: 200 // Để hỗ trợ legacy browsers
-};
-
-app.use(cors(corsOptions));
+  optionsSuccessStatus: 200
+}));
 
 
 
