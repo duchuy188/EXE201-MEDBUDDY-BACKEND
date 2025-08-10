@@ -7,6 +7,9 @@ const MedicationSchema = new mongoose.Schema({
   form: { type: String },
   image: { type: String },
   note: { type: String },
+  timeOfDay: { type: String }, // Sáng, Chiều, Tối
+  time: { type: String }, // Giờ uống cụ thể (HH:mm)
+  expirationDate: { type: Date }, // Hạn sử dụng
   createdAt: { type: Date, default: Date.now }
 });
 

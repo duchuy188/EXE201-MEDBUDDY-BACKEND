@@ -15,8 +15,8 @@ exports.getMedications = async (req, res) => {
 exports.createMedication = async (req, res) => {
   try {
     const userId = req.user?._id || req.body.userId;
-    const { name, dosage, form, image, note } = req.body;
-    const medication = new Medication({ userId, name, dosage, form, image, note });
+    const { name, dosage, form, image, note, timeOfDay, time, expirationDate } = req.body;
+    const medication = new Medication({ userId, name, dosage, form, image, note, timeOfDay, time, expirationDate });
     await medication.save();
     res.status(201).json(medication);
   } catch (err) {
@@ -38,10 +38,10 @@ exports.getMedicationById = async (req, res) => {
 // Cập nhật thông tin thuốc
 exports.updateMedication = async (req, res) => {
   try {
-    const { name, dosage, form, image, note } = req.body;
+    const { name, dosage, form, image, note, timeOfDay, time, expirationDate } = req.body;
     const medication = await Medication.findByIdAndUpdate(
       req.params.id,
-      { name, dosage, form, image, note },
+      { name, dosage, form, image, note, timeOfDay, time, expirationDate },
       { new: true }
     );
     if (!medication) return res.status(404).json({ message: 'Không tìm thấy thuốc' });
