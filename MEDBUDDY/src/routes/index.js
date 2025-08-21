@@ -7,7 +7,9 @@ const remindersRouter = require('./reminders');
 const bloodPressureRouter = require('./bloodPressure');
 const notificationsRouter = require('./notifications');
 const alertsRouter = require('./alerts');
+
 const medicationHistoryRouter = require('./medicationsHistory');
+const ocrRouter = require('./ocr');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -36,5 +38,8 @@ router.use('/alerts', alertsRouter);
 
 // Medication history routes
 router.use('/medication-history', medicationHistoryRouter);
+
+// OCR routes
+router.use('/ocr', ocrRouter);
 
 module.exports = router;
