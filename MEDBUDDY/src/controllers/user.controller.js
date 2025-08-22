@@ -19,7 +19,7 @@ exports.updateProfile = async (req, res) => {
     return res.status(400).json({ message: "Thiếu dữ liệu gửi lên" });
   }
 
-  const { fullName, email, phoneNumber, password, dateOfBirth, ...otherFields } = req.body;
+  const { fullName, email, phoneNumber, dateOfBirth, ...otherFields } = req.body;
   const avatarFile = req.file; // Lấy file avatar từ multer
 
   // Không cho phép sửa role
@@ -29,8 +29,10 @@ exports.updateProfile = async (req, res) => {
     });
   }
 
-  // Không cho phép sửa các field khác không được định nghĩa
-  if (Object.keys(otherFields).length > 0) {
+  // Không cho phép sửa các field khác không được định nghĩa (bỏ qua avatar)
+  const allowedFields = ["fullName", "email", "phoneNumber", "dateOfBirth"];
+  const invalidFields = Object.keys(otherFields).filter(f => f !== "avatar" && f !== "role");
+  if (invalidFields.length > 0) {
     return res.status(400).json({
       message: "Chỉ được cập nhật fullName, email, phoneNumber, password, dateOfBirth, avatar",
     });
@@ -44,9 +46,7 @@ exports.updateProfile = async (req, res) => {
     if (email !== undefined) updateFields.email = email;
     if (phoneNumber !== undefined) updateFields.phoneNumber = phoneNumber;
     if (dateOfBirth !== undefined) updateFields.dateOfBirth = dateOfBirth;
-    if (password !== undefined) {
-      updateFields.password = await bcrypt.hash(password, 10);
-    }
+  // Không cho phép cập nhật password ở đây
 
     // Xử lý upload avatar nếu có
     if (avatarFile) {

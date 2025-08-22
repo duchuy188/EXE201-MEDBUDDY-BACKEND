@@ -57,14 +57,16 @@
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               fullName:
  *                 type: string
  *               email:
  *                 type: string
- *               phone:
+ *               phoneNumber:
  *                 type: string
- *               password:
+ 
+ *               dateOfBirth:
  *                 type: string
+ *                 format: date
  *               avatar:
  *                 type: string
  *                 format: binary

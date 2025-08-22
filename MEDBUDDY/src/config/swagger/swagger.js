@@ -15,15 +15,15 @@ module.exports = {
     ],
     components: {
       securitySchemes: {
-        JWT: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'Authorization',
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
           description: 'Enter JWT Bearer token **_only_**',
         },
       },
     },
-    security: [{ JWT: [] }],
+    security: [{ bearerAuth: [] }],
   },
   apis: [
     path.join(__dirname, './apis/*.js'),

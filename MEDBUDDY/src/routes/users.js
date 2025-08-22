@@ -17,8 +17,8 @@ router.put("/profile", authMiddleware, upload.single("avatar"), userController.u
 // Đổi mật khẩu
 router.post("/change-password", authMiddleware, userController.changePassword);
 
-// Xóa avatar
-router.delete("/remove-avatar", authMiddleware, userController.removeAvatar);
+// Xóa avatar (dùng POST cho Swagger UI)
+router.post("/remove-avatar", authMiddleware, userController.removeAvatar);
 
 // Dashboard test quyền
 router.get("/dashboard", authMiddleware, userController.dashboard);

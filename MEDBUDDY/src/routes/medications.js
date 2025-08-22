@@ -27,3 +27,5 @@ router.put('/:id', authMiddleware, medicationsController.updateMedication);
 router.delete('/:id', authMiddleware, medicationsController.deleteMedication);
 
 module.exports = router;
+// Lưu nhiều thuốc từ OCR
+router.post('/from-ocr', authMiddleware, medicationsController.createMedicationsFromOcr);

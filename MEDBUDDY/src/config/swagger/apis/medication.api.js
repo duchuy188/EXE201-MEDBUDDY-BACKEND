@@ -1,5 +1,52 @@
 /**
  * @swagger
+ * /medications/from-ocr:
+ *   post:
+ *     summary: Lưu nhiều thuốc từ kết quả OCR
+ *     tags: [Medications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID người dùng
+ *               medicines:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     quantity:
+ *                       type: string
+ *                     form:
+ *                       type: string
+ *                     usage:
+ *                       type: string
+ *               imageUrl:
+ *                 type: string
+ *                 description: URL ảnh đơn thuốc
+ *               rawText:
+ *                 type: string
+ *                 description: Văn bản OCR gốc
+ *     responses:
+ *       201:
+ *         description: Danh sách thuốc đã lưu
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Medication'
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ */
+/**
+ * @swagger
  * tags:
  *   name: Medications
  *   description: Quản lý thuốc cho nhắc nhở cao huyết áp

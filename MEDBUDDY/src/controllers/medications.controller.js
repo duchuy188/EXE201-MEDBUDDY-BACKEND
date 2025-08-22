@@ -1,3 +1,27 @@
+// Lưu nhiều thuốc từ kết quả OCR
+exports.createMedicationsFromOcr = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.body.userId;
+    const { medicines, imageUrl, rawText } = req.body;
+    if (!Array.isArray(medicines) || medicines.length === 0) {
+      return res.status(400).json({ message: 'Danh sách thuốc không hợp lệ' });
+    }
+    // Map từng thuốc sang schema Medication
+    const docs = medicines.map(med => ({
+      userId,
+      name: med.name,
+      dosage: med.quantity || med.dosage || '',
+      form: med.form || '',
+      image: imageUrl || '',
+      note: med.usage || med.note || '',
+      // Có thể lưu rawText vào note hoặc trường riêng nếu muốn
+    }));
+    const result = await require('../models/Medication').insertMany(docs);
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ message: 'Không thể lưu danh sách thuốc', error: err.message });
+  }
+};
 const Medication = require('../models/Medication');
 
 // Lấy danh sách thuốc của người dùng
