@@ -15,8 +15,8 @@ exports.getReminders = async (req, res) => {
 exports.createReminder = async (req, res) => {
   try {
     const userId = req.user?._id || req.body.userId;
-    const { medicationId, time, repeat, note } = req.body;
-    const reminder = new Reminder({ userId, medicationId, time, repeat, note });
+    const { medicationId, time, repeat, note, date } = req.body; // Nhận thêm trường `date`
+    const reminder = new Reminder({ userId, medicationId, time, repeat, note, date });
     await reminder.save();
     res.status(201).json(reminder);
   } catch (err) {
