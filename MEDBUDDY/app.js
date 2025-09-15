@@ -28,6 +28,7 @@ var medicationsRouter = require('./src/routes/medications');
 var medicationsHistoryRouter = require('./src/routes/medicationsHistory');
 var notificationsRouter = require('./src/routes/notifications');
 var remindersRouter = require('./src/routes/reminders');
+var appointmentsRouter = require('./src/routes/appointments');
 
 var app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/medications', medicationsRouter);
 app.use('/api/medications-history', medicationsHistoryRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/reminders', remindersRouter);
+app.use('/api/appointments', appointmentsRouter);
 
 // Swagger UI route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

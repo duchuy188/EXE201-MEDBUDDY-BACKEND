@@ -8,6 +8,8 @@
  *         - userId
  *         - medicationId
  *         - time
+ *         - startDate
+ *         - endDate
  *       properties:
  *         _id:
  *           type: string
@@ -21,6 +23,12 @@
  *         time:
  *           type: string
  *           description: Thời gian nhắc (HH:mm hoặc ISO)
+ *         startDate:
+ *           type: string
+ *           description: Ngày bắt đầu (YYYY-MM-DD)
+ *         endDate:
+ *           type: string
+ *           description: Ngày kết thúc (YYYY-MM-DD)
  *         repeat:
  *           type: string
  *           enum: [daily, weekly, custom]
@@ -42,4 +50,6 @@
  *         repeat: "daily"
  *         note: "Uống sau khi ăn sáng"
  *         isActive: true
+ *         startDate: "2025-09-13"
+ *         endDate: "2025-09-20"
  */
