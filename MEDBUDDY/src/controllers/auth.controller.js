@@ -1,8 +1,10 @@
 
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
-
 const jwt = require('jsonwebtoken');
+const sendOtpEmail = require('../utils/sendOtp');
+const otpStore = {};
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -39,6 +41,60 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.sendOtpForgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ message: 'Vui lòng nhập email.' });
+  }
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({ message: 'Email không tồn tại.' });
+  }
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  otpStore[email] = { otp, expires: Date.now() + 5 * 60 * 1000 }; // OTP hết hạn sau 5 phút
+  try {
+    await sendOtpEmail(email, otp);
+    res.json({ message: 'OTP đã được gửi về email!' });
+  } catch (error) {
+    res.status(500).json({ message: 'Gửi email thất bại!', error: error.message });
+  }
+};
+
+// Xác thực OTP và đổi mật khẩu
+
+// Xác thực OTP riêng
+exports.verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({ message: 'Thiếu thông tin.' });
+  }
+  const record = otpStore[email];
+  if (!record || record.otp != otp || record.expires < Date.now()) {
+    return res.status(400).json({ message: 'OTP không hợp lệ hoặc đã hết hạn.' });
+  }
+  res.json({ message: 'OTP hợp lệ!' });
+};
+
+// Đổi mật khẩu chỉ cần email và newPassword, OTP đã xác thực ở bước trước
+exports.resetPasswordWithOtp = async (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) {
+    return res.status(400).json({ message: 'Thiếu thông tin.' });
+  }
+  const record = otpStore[email];
+  if (!record || record.expires < Date.now()) {
+    return res.status(400).json({ message: 'OTP chưa xác thực hoặc đã hết hạn.' });
+  }
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({ message: 'Email không tồn tại.' });
+  }
+  user.password = await bcrypt.hash(newPassword, 10);
+  await user.save();
+  delete otpStore[email];
+  res.json({ message: 'Đổi mật khẩu thành công!' });
+};
+
 exports.register = async (req, res) => {
   try {
     const { fullName, email, phoneNumber, password, role, dateOfBirth } = req.body;
@@ -56,6 +112,7 @@ exports.register = async (req, res) => {
     const user = new User({ fullName, email, phoneNumber, password: hashedPassword, role, dateOfBirth });
     await user.save();
     res.status(201).json({ message: 'Registration successful!' });
+
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

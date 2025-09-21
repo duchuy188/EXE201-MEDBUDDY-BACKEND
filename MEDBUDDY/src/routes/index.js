@@ -10,6 +10,7 @@ const alertsRouter = require('./alerts');
 
 const medicationHistoryRouter = require('./medicationsHistory');
 const ocrRouter = require('./ocr');
+const relativePatientRouter = require('./relativePatient');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -38,6 +39,9 @@ router.use('/alerts', alertsRouter);
 
 // Medication history routes
 router.use('/medication-history', medicationHistoryRouter);
+
+// Relative-Patient routes
+router.use('/relative-patient', relativePatientRouter);
 
 // OCR routes
 router.use('/ocr', ocrRouter);

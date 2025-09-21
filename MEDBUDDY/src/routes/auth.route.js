@@ -10,4 +10,15 @@ router.post('/register', authController.register);
 // Login
 router.post('/login', authController.login);
 
+
+// Gửi OTP về email để quên mật khẩu
+router.post('/send-otp', authController.sendOtpForgotPassword);
+
+
+// Xác thực OTP riêng
+router.post('/verify-otp', authController.verifyOtp);
+
+// Đổi mật khẩu sau khi xác thực OTP
+router.post('/reset-password', authController.resetPasswordWithOtp);
+
 module.exports = router;
