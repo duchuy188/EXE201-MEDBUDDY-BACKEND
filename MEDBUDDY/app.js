@@ -32,6 +32,26 @@ var appointmentsRouter = require('./src/routes/appointments');
 
 var app = express();
 
+app.use(express.json()); // Đảm bảo parse body trước các route
+
+// Route test gửi notification qua Expo
+const { sendExpoNotification } = require('./src/services/expoService');
+app.post('/test-expo', async (req, res) => {
+  if (!req.body) {
+    return res.status(400).json({ error: 'Missing request body' });
+  }
+  const { token, title, body, data } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'Missing Expo push token' });
+  }
+  try {
+    const result = await sendExpoNotification(token, title, body, data);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // CORS configuration - Simplified for development
 app.use(cors({
   origin: true,  // Cho phép tất cả origins trong development
