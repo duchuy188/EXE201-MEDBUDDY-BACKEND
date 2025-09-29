@@ -68,7 +68,7 @@ exports.ocrPrescription = async (req, res) => {
         }
         
         // Start new medicine
-        currentMed = { name: '', quantity: '', usage: '' };
+        currentMed = { name: '', quantity: '', usage: '', note: '' };
         
         // Sử dụng regex cải thiện để tách name và quantity
         const fullMatch = line.match(/^\d+\s*[\/\)\.\-\s]\s*(.+)$/);
@@ -96,7 +96,7 @@ exports.ocrPrescription = async (req, res) => {
       
       // Case 2: Dòng có thể là tên thuốc (không có số thứ tự nhưng có keywords thuốc)
       if (!currentMed && medicineKeywords.test(line)) {
-        currentMed = { name: '', quantity: '', usage: '' };
+        currentMed = { name: '', quantity: '', usage: '', note: '' };
         
         const qtyMatch = line.match(regexQty);
         if (qtyMatch) {
@@ -153,6 +153,16 @@ exports.ocrPrescription = async (req, res) => {
           currentMed.name += ' ' + line.trim();
           continue;
         }
+        // Nếu dòng không phải tên thuốc, quantity, usage thì gom vào note
+        if (
+          !regexMedStart.test(line) &&
+          !medicineKeywords.test(line) &&
+          !regexQty.test(line) &&
+          !regexUsage.test(line) &&
+          line.length > 2
+        ) {
+          currentMed.note = (typeof currentMed.note === 'string' ? currentMed.note : '') + (currentMed.note ? ' ' : '') + line;
+        }
       }
     }
     
@@ -177,8 +187,9 @@ exports.ocrPrescription = async (req, res) => {
       })
       .map(m => ({
         name: m.name.trim(),
-        quantity: m.quantity.trim(), 
-        usage: m.usage.trim()
+        quantity: m.quantity.trim(),
+        usage: m.usage.trim(),
+        note: typeof m.note === 'string' ? m.note.trim() : ''
       }));;
     
     console.log('Extracted medicines:', result); // Debug log

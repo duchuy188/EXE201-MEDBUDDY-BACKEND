@@ -8,6 +8,10 @@ router.post('/token', notificationController.saveToken);
 // POST /notifications/send – Gửi thông báo nhắc uống thuốc
 router.post('/send', notificationController.sendNotification);
 
+
+// POST /notifications/delete-token – Xóa token thiết bị khi logout
+router.post('/delete-token', notificationController.deleteToken);
+
 // GET /notifications/history – Lịch sử thông báo đã gửi
 router.get('/history', notificationController.getNotificationHistory);
 

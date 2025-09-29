@@ -52,6 +52,27 @@
  *       200:
  *         description: Đã gửi thông báo
  *
+ * /notifications/delete-token:
+ *   post:
+ *     summary: Xóa token thiết bị khi logout
+ *     tags: [Notifications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID người dùng
+ *               deviceToken:
+ *                 type: string
+ *                 description: Token thiết bị cần xóa
+ *     responses:
+ *       200:
+ *         description: Đã xóa token
+
  * /notifications/history:
  *   get:
  *     summary: Lấy lịch sử thông báo đã gửi

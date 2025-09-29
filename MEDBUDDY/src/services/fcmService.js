@@ -19,14 +19,14 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-// Hàm gửi notification tới 1 thiết bị
-async function sendNotification(registrationToken, title, body) {
+// Hàm gửi notification tới 1 thiết bị, hỗ trợ truyền tên file âm thanh
+async function sendNotification(registrationToken, title, body, sound = "default") {
   const message = {
-    notification: {
-      title,
-      body
-    },
-    token: registrationToken
+    token: registrationToken,
+    notification: { title, body }, // KHÔNG truyền sound ở đây!
+    data: { sound },
+  android: { notification: { /* sound */ } },
+    apns: { payload: { aps: { sound } } }
   };
   try {
     const response = await admin.messaging().send(message);

@@ -80,6 +80,49 @@
 
 /**
  * @swagger
+ * /relative-patient/add-patient:
+ *   post:
+ *     tags: [RelativePatient]
+ *     summary: Người thân thêm người bệnh vào danh sách theo dõi
+ *     description: Chỉ người thân (role=relative) mới có thể thêm người bệnh (role=patient)
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "patient@example.com"
+ *     responses:
+ *       201:
+ *         description: Đã gửi mã OTP xác nhận tới email người bệnh
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Đã gửi mã OTP xác nhận tới email người bệnh"
+ *                 linkId:
+ *                   type: string
+ *                   example: "6510b2e2c8a1f2b1a1a1a1a1"
+ *       400:
+ *         description: Email không hợp lệ hoặc đã tồn tại liên kết hoặc đã gửi lời mời
+ *       403:
+ *         description: Không có quyền thực hiện (chỉ relative mới được thêm patient)
+ *       404:
+ *         description: Không tìm thấy người bệnh với email này
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
  * /relative-patient/patients:
  *   get:
  *     tags: [RelativePatient]

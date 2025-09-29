@@ -27,6 +27,7 @@ module.exports = {
   },
   apis: [
     path.join(__dirname, './apis/*.js'),
+    path.join(__dirname, './apis/vnpay.api.js'),
     path.join(__dirname, './schemas/*.js'),
     path.join(__dirname, '../../routes/*.js'),
     path.join(__dirname, '../../controllers/*.js'),

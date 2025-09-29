@@ -29,7 +29,7 @@ const ReminderSchema = new mongoose.Schema({
     enum: [-3, -2, -1, 0, 1, 2, 3],
     default: 0
   },
-  audioUrl: { type: String },
+  // audioUrl: { type: String },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   status: { type: String, enum: ['pending', 'completed', 'snoozed'], default: 'pending' }, // Trạng thái nhắc nhở

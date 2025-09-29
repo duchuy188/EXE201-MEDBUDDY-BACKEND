@@ -17,6 +17,9 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerOptions = require('./src/config/swagger/swagger');
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
+// Import reminder job để job tự động chạy
+require('./src/jobs/reminderJob');
+
 
 var indexRouter = require('./src/routes/index');
 var usersRouter = require('./src/routes/users');

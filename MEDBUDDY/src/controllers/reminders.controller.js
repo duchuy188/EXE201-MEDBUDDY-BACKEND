@@ -51,20 +51,7 @@ exports.createReminder = async (req, res) => {
       speed: speed || 0
     });
 
-    // Generate TTS only for voice reminders
-    if (reminder.reminderType === 'voice') {
-      const ttsResult = await TextToSpeechService.generateSpeech(reminderNote, {
-        voice: reminder.voice,
-        speed: reminder.speed
-      });
-
-      if (ttsResult.success) {
-        reminder.audioUrl = ttsResult.audioUrl;
-      } else {
-        console.error('TTS generation failed:', ttsResult.error);
-      }
-    }
-
+  // Không tạo audioUrl, chỉ lưu tên file voice (ví dụ: banmai.mp3)
     await reminder.save();
     res.status(201).json(reminder);
   } catch (err) {

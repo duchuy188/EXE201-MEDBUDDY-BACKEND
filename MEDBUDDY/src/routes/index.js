@@ -11,13 +11,13 @@ const alertsRouter = require('./alerts');
 const medicationHistoryRouter = require('./medicationsHistory');
 const ocrRouter = require('./ocr');
 const relativePatientRouter = require('./relativePatient');
+const packageRouter = require('./package');
+const vnpayRouter = require('./vnpay');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
   res.send('Welcome to MEDBUDDY API!');
 });
-
-// User routes
 
 // User routes
 router.use('/users', usersRouter);
@@ -45,5 +45,11 @@ router.use('/relative-patient', relativePatientRouter);
 
 // OCR routes
 router.use('/ocr', ocrRouter);
+
+// Package routes
+router.use('/package', packageRouter);
+
+// VNPay routes
+router.use('/vnpay', vnpayRouter);
 
 module.exports = router;
