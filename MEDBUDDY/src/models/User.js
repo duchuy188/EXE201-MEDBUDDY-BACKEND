@@ -35,6 +35,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '', // Link ảnh đại diện
   },
+  isBlocked: {
+    type: Boolean,
+    default: false,
+  },
+  blockedAt: {
+    type: Date,
+    default: null,
+  },
+  blockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
