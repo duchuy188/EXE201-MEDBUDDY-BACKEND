@@ -32,7 +32,7 @@ cron.schedule('* * * * *', async () => {
           String(tokenDoc.deviceToken),
           'Nhắc uống thuốc',
           `Đã đến giờ uống thuốc: ${reminder.note || 'Không có ghi chú'}`,
-          reminder.reminderType === 'voice' ? `${reminder.voice}.mp3` : 'default'
+          reminder.reminderType === 'voice' ? `${reminder.voice}` : 'default'
         );
         await NotificationHistory.create({
           userId: reminder.userId._id,
@@ -40,9 +40,9 @@ cron.schedule('* * * * *', async () => {
           body: `Đã đến giờ uống thuốc: ${reminder.note || 'Không có ghi chú'}`,
           deviceToken: tokenDoc.deviceToken,
           sentAt: new Date(),
-          sound: reminder.reminderType === 'voice' ? `${reminder.voice}.mp3` : 'default'
+          sound: reminder.reminderType === 'voice' ? `${reminder.voice}` : 'default'
         });
-        console.log(`[REMINDER] Đã gửi thông báo cho userId: ${reminder.userId._id} - deviceToken: ${tokenDoc.deviceToken} - sound: ${reminder.reminderType === 'voice' ? `${reminder.voice}.mp3` : 'default'}`);
+        console.log(`[REMINDER] Đã gửi thông báo cho userId: ${reminder.userId._id} - deviceToken: ${tokenDoc.deviceToken} - sound: ${reminder.reminderType === 'voice' ? `${reminder.voice}` : 'default'}`);
       }
     }
 
@@ -61,9 +61,9 @@ cron.schedule('* * * * *', async () => {
           String(tokenDoc.deviceToken),
           'Nhắc uống thuốc',
           `Đã đến giờ uống thuốc: ${reminder.note || 'Không có ghi chú'}`,
-          reminder.reminderType === 'voice' ? `${reminder.voice}.mp3` : 'default'
+          reminder.reminderType === 'voice' ? `${reminder.voice}` : 'default'
         );
-        console.log(`[REMINDER-SNOOZE] Đã gửi thông báo cho userId: ${reminder.userId._id} - deviceToken: ${tokenDoc.deviceToken} - sound: ${reminder.reminderType === 'voice' ? `${reminder.voice}.mp3` : 'default'}`);
+        console.log(`[REMINDER-SNOOZE] Đã gửi thông báo cho userId: ${reminder.userId._id} - deviceToken: ${tokenDoc.deviceToken} - sound: ${reminder.reminderType === 'voice' ? `${reminder.voice}` : 'default'}`);
       }
       // Cập nhật trạng thái nhắc nhở về `pending` sau khi gửi thông báo
       reminder.status = 'pending';

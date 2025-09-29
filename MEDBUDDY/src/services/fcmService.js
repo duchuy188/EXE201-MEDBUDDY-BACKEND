@@ -20,13 +20,14 @@ admin.initializeApp({
 });
 
 // Hàm gửi notification tới 1 thiết bị, hỗ trợ truyền tên file âm thanh
-async function sendNotification(registrationToken, title, body, sound = "default") {
+async function sendNotification(registrationToken, title, body, sound = "default", channelId = "medbuddy_channel") {
+  const soundName = sound.endsWith('.mp3') ? sound.replace('.mp3', '') : sound;
   const message = {
     token: registrationToken,
-    notification: { title, body }, // KHÔNG truyền sound ở đây!
-    data: { sound },
-  android: { notification: { /* sound */ } },
-    apns: { payload: { aps: { sound } } }
+    notification: { title, body },
+    data: { sound: soundName },
+    android: { notification: { sound: soundName, channel_id: "medbuddy_channel" } },
+    apns: { payload: { aps: { sound: soundName } } }
   };
   try {
     const response = await admin.messaging().send(message);
