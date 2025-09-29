@@ -20,15 +20,26 @@ admin.initializeApp({
 });
 
 // Hàm gửi notification tới 1 thiết bị, hỗ trợ truyền tên file âm thanh
-async function sendNotification(registrationToken, title, body, sound = "default", channelId = "medbuddy_channel") {
+async function sendNotification(registrationToken, title, body, sound = "default", channelId) {
   const soundName = sound.endsWith('.mp3') ? sound.replace('.mp3', '') : sound;
+  let channelIdAuto = channelId;
+  if (!channelIdAuto) {
+    channelIdAuto = soundName + '_channel';
+  }
+  const dataPayload = { sound: String(soundName) };
+  if (channelIdAuto) dataPayload.channel_id = String(channelIdAuto);
+  const androidNotification = { sound: soundName };
+  if (channelIdAuto) androidNotification.channel_id = String(channelIdAuto);
   const message = {
     token: registrationToken,
     notification: { title, body },
-    data: { sound: soundName },
-    android: { notification: { sound: soundName, channel_id: "medbuddy_channel" } },
+    data: dataPayload,
+    android: {
+      notification: androidNotification
+    },
     apns: { payload: { aps: { sound: soundName } } }
   };
+  console.log('[FCM PAYLOAD]', JSON.stringify(message, null, 2)); // Log chi tiết payload FCM
   try {
     const response = await admin.messaging().send(message);
     console.log('Gửi thành công:', response);
