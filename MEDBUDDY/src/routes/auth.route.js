@@ -21,4 +21,10 @@ router.post('/verify-otp', authController.verifyOtp);
 // Đổi mật khẩu sau khi xác thực OTP
 router.post('/reset-password', authController.resetPasswordWithOtp);
 
+// Refresh token
+router.post('/refresh-token', authController.refreshToken);
+
+// Logout
+router.post('/logout', authController.logout);
+
 module.exports = router;
