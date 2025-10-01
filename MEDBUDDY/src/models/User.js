@@ -48,6 +48,27 @@ const userSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
+  // Package info
+  activePackage: {
+    packageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Package',
+      default: null,
+    },
+    startDate: {
+      type: Date,
+      default: null,
+    },
+    endDate: {
+      type: Date,
+      default: null,
+    },
+    features: [String],
+    isActive: {
+      type: Boolean,
+      default: false,
+    },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

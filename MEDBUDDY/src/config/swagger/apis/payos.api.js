@@ -165,7 +165,56 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/WebhookData'
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: "00"
+ *                 description: Mã lỗi
+ *               desc:
+ *                 type: string
+ *                 example: "success"
+ *                 description: Thông tin lỗi
+ *               success:
+ *                 type: boolean
+ *                 example: true
+ *               data:
+ *                 type: object
+ *                 properties:
+ *                   orderCode:
+ *                     type: number
+ *                     example: 123
+ *                   amount:
+ *                     type: number
+ *                     example: 3000
+ *                   description:
+ *                     type: string
+ *                     example: "VQRIO123"
+ *                   accountNumber:
+ *                     type: string
+ *                     example: "12345678"
+ *                   reference:
+ *                     type: string
+ *                     example: "TF230204212323"
+ *                   transactionDateTime:
+ *                     type: string
+ *                     example: "2023-02-04 18:25:00"
+ *                   currency:
+ *                     type: string
+ *                     example: "VND"
+ *                   paymentLinkId:
+ *                     type: string
+ *                     example: "124c33293c43417ab7879e14c8d9eb18"
+ *                   code:
+ *                     type: string
+ *                     example: "00"
+ *                   desc:
+ *                     type: string
+ *                     example: "Thành công"
+ *               signature:
+ *                 type: string
+ *                 example: "8d8640d802576397a1ce45ebda7f835055768ac7ad2e0bfb77f9b8f12cca4c7f"
+ *                 description: Chữ ký xác thực
  *     responses:
  *       200:
  *         description: Webhook xử lý thành công
@@ -177,8 +226,118 @@
  *                 message:
  *                   type: string
  *                   example: "Webhook processed successfully"
+ *                 code:
+ *                   type: string
+ *                   example: "00"
+ *                 desc:
+ *                   type: string
+ *                   example: "success"
  *       400:
  *         description: Chữ ký không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid signature"
+ *                 code:
+ *                   type: string
+ *                   example: "01"
+ *                 desc:
+ *                   type: string
+ *                   example: "Invalid signature"
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /api/payos/return:
+ *   get:
+ *     summary: Return URL - xử lý khi thanh toán thành công
+ *     tags: [PayOS]
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: Mã lỗi
+ *         example: "00"
+ *       - in: query
+ *         name: id
+ *         schema:
+ *           type: string
+ *         description: Payment Link Id
+ *         example: "2e4acf1083304877bf1a8c108b30cccd"
+ *       - in: query
+ *         name: cancel
+ *         schema:
+ *           type: string
+ *         description: Trạng thái hủy
+ *         example: "false"
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PAID, PENDING, PROCESSING, CANCELLED]
+ *         description: Trạng thái thanh toán
+ *         example: "PAID"
+ *       - in: query
+ *         name: orderCode
+ *         schema:
+ *           type: number
+ *         description: Mã đơn hàng
+ *         example: 803347
+ *     responses:
+ *       302:
+ *         description: Redirect về frontend
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /api/payos/cancel:
+ *   get:
+ *     summary: Cancel URL - xử lý khi hủy thanh toán
+ *     tags: [PayOS]
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: Mã lỗi
+ *         example: "01"
+ *       - in: query
+ *         name: id
+ *         schema:
+ *           type: string
+ *         description: Payment Link Id
+ *         example: "2e4acf1083304877bf1a8c108b30cccd"
+ *       - in: query
+ *         name: cancel
+ *         schema:
+ *           type: string
+ *         description: Trạng thái hủy
+ *         example: "true"
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PAID, PENDING, PROCESSING, CANCELLED]
+ *         description: Trạng thái thanh toán
+ *         example: "CANCELLED"
+ *       - in: query
+ *         name: orderCode
+ *         schema:
+ *           type: number
+ *         description: Mã đơn hàng
+ *         example: 803347
+ *     responses:
+ *       302:
+ *         description: Redirect về frontend
  *       500:
  *         description: Lỗi server
  */
