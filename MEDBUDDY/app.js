@@ -32,6 +32,7 @@ var medicationsHistoryRouter = require('./src/routes/medicationsHistory');
 var notificationsRouter = require('./src/routes/notifications');
 var remindersRouter = require('./src/routes/reminders');
 var appointmentsRouter = require('./src/routes/appointments');
+var payosRouter = require('./src/routes/payos');
 
 var app = express();
 
@@ -85,6 +86,7 @@ app.use('/api/medications-history', medicationsHistoryRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/reminders', remindersRouter);
 app.use('/api/appointments', appointmentsRouter);
+app.use('/api/payos', payosRouter);
 
 // Swagger UI route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
