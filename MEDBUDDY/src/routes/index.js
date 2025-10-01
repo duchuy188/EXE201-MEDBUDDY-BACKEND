@@ -14,6 +14,9 @@ const relativePatientRouter = require('./relativePatient');
 const packageRouter = require('./package');
 const vnpayRouter = require('./vnpay');
 const bloodPressureReminderRouter = require('./bloodPressureReminder');
+const payosRouter = require('./payos');
+const userPackageRouter = require('./userPackage');
+const adminRouter = require('./admin');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -55,5 +58,13 @@ router.use('/vnpay', vnpayRouter);
 
 // Blood Pressure Reminder routes
 router.use('/blood-pressure-reminder', bloodPressureReminderRouter);
+// PayOS routes
+router.use('/payos', payosRouter);
+
+// User Package routes
+router.use('/user-package', userPackageRouter);
+
+// Admin routes
+router.use('/admin', adminRouter);
 
 module.exports = router;
