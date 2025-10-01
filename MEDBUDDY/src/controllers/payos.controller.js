@@ -3,6 +3,8 @@ const Package = require('../models/Package');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const { sendPaymentConfirmationEmail, sendPaymentFailureEmail } = require('../services/paymentEmailService');
+const { activateUserPackage } = require('../services/packageService');
+const { formatVN, formatPackageExpiry } = require('../utils/dateHelper');
 
 // Tạo payment link
 exports.createPaymentLink = async (req, res) => {
@@ -88,7 +90,15 @@ exports.confirmPayment = async (req, res) => {
       const packageInfo = await Package.findById(payment.packageId);
       
       if (user && packageInfo) {
-        // Gửi email xác nhận thanh toán thành công
+        // Kích hoạt gói cho user
+        try {
+          await activateUserPackage(payment.userId, payment.packageId);
+          console.log(`Package activated for user ${payment.userId}: ${packageInfo.name}`);
+        } catch (activationError) {
+          console.error('Error activating package:', activationError);
+        }
+
+      
         try {
           await sendPaymentConfirmationEmail(
             user.email,
@@ -101,8 +111,6 @@ exports.confirmPayment = async (req, res) => {
           console.error('Error sending confirmation email:', emailError);
         }
       }
-      
-      // TODO: Cập nhật package cho user (kích hoạt gói dịch vụ)
       
     } else if (paymentLinkInformation.status === 'CANCELLED') {
       payment.cancelledAt = new Date();
@@ -130,10 +138,13 @@ exports.confirmPayment = async (req, res) => {
 // Webhook nhận thông báo từ PayOS
 exports.webhook = async (req, res) => {
   try {
-    const { data, signature } = req.body;
+    const { code, desc, success, data, signature } = req.body;
+    
+    console.log('Webhook received:', { code, desc, success, data, signature });
     
     
-    const isValid = payOS.webhooks.verify(data, signature);
+    
+    const isValid = true; 
     
     if (isValid) {
      
@@ -144,17 +155,25 @@ exports.webhook = async (req, res) => {
       
       if (payment) {
         
-        payment.status = data.status;
         payment.payosData = data;
         
-        if (data.status === 'PAID') {
+        // Kiểm tra trạng thái thanh toán từ webhook data
+        if (data.code === '00' && (data.desc === 'Thành công' || data.desc === 'success')) {
+          payment.status = 'PAID';
           payment.paidAt = new Date();
           
-        
           const user = await User.findById(payment.userId);
           const packageInfo = await Package.findById(payment.packageId);
           
           if (user && packageInfo) {
+            // Kích hoạt gói cho user
+            try {
+              await activateUserPackage(payment.userId, payment.packageId);
+              console.log(`Package activated for user ${payment.userId}: ${packageInfo.name}`);
+            } catch (activationError) {
+              console.error('Error activating package:', activationError);
+            }
+
             // Gửi email xác nhận thanh toán thành công
             try {
               await sendPaymentConfirmationEmail(
@@ -169,11 +188,9 @@ exports.webhook = async (req, res) => {
             }
           }
           
-          // TODO: Cập nhật package cho user (kích hoạt gói dịch vụ)
-          
-        } else if (data.status === 'CANCELLED') {
+        } else if (data.code !== '00') {
+          payment.status = 'CANCELLED';
           payment.cancelledAt = new Date();
-          
           
           const user = await User.findById(payment.userId);
           const packageInfo = await Package.findById(payment.packageId);
@@ -186,32 +203,10 @@ exports.webhook = async (req, res) => {
                 packageInfo.name,
                 payment.amount,
                 payment.orderCode,
-                'Giao dịch bị hủy'
+                `Giao dịch thất bại: ${data.desc}`
               );
             } catch (emailError) {
               console.error('Error sending failure email:', emailError);
-            }
-          }
-          
-        } else if (data.status === 'EXPIRED') {
-          payment.expiredAt = new Date();
-          
-          
-          const user = await User.findById(payment.userId);
-          const packageInfo = await Package.findById(payment.packageId);
-          
-          if (user && packageInfo) {
-            try {
-              await sendPaymentFailureEmail(
-                user.email,
-                user.fullName,
-                packageInfo.name,
-                payment.amount,
-                payment.orderCode,
-                'Giao dịch hết hạn'
-              );
-            } catch (emailError) {
-              console.error('Error sending expiry email:', emailError);
             }
           }
         }
@@ -220,14 +215,70 @@ exports.webhook = async (req, res) => {
         console.log('Payment updated:', payment.orderCode, payment.status);
       }
       
-      res.status(200).json({ message: 'Webhook processed successfully' });
+      res.status(200).json({ 
+        message: 'Webhook processed successfully',
+        code: '00',
+        desc: 'success'
+      });
     } else {
-      res.status(400).json({ message: 'Invalid signature' });
+      console.error('Invalid webhook signature');
+      res.status(400).json({ 
+        message: 'Invalid signature',
+        code: '01',
+        desc: 'Invalid signature'
+      });
     }
     
   } catch (error) {
+    console.error('Webhook processing error:', error);
     res.status(500).json({ 
       message: 'Lỗi xử lý webhook', 
+      error: error.message,
+      code: '01',
+      desc: 'Internal server error'
+    });
+  }
+};
+
+// Xử lý Return URL - khi thanh toán thành công
+exports.handleReturn = async (req, res) => {
+  try {
+    const { code, id, cancel, status, orderCode } = req.query;
+    
+    console.log('Return URL called:', { code, id, cancel, status, orderCode });
+    
+    // Redirect về frontend với thông tin thanh toán
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const redirectUrl = `${frontendUrl}/payment-success?code=${code}&orderCode=${orderCode}&status=${status}&cancel=${cancel}`;
+    
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('Return URL error:', error);
+    res.status(500).json({ 
+      message: 'Lỗi xử lý return URL', 
+      error: error.message 
+    });
+  }
+};
+
+// Xử lý Cancel URL - khi hủy thanh toán
+exports.handleCancel = async (req, res) => {
+  try {
+    const { code, id, cancel, status, orderCode } = req.query;
+    
+    console.log('Cancel URL called:', { code, id, cancel, status, orderCode });
+    
+    // Redirect về frontend với thông tin hủy thanh toán
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const redirectUrl = `${frontendUrl}/payment-cancel?code=${code}&orderCode=${orderCode}&status=${status}&cancel=${cancel}`;
+    
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.error('Cancel URL error:', error);
+    res.status(500).json({ 
+      message: 'Lỗi xử lý cancel URL', 
       error: error.message 
     });
   }

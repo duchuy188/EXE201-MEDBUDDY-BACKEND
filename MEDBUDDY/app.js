@@ -20,6 +20,9 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Import reminder job để job tự động chạy
 require('./src/jobs/reminderJob');
 
+// Import package expiry job để job tự động chạy
+const { startPackageJobs } = require('./src/jobs/packageExpiryJob');
+
 
 var indexRouter = require('./src/routes/index');
 var usersRouter = require('./src/routes/users');

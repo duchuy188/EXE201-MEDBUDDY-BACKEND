@@ -15,6 +15,12 @@ router.get('/payment-info/:orderCode', payosController.getPaymentInfo);
 // Webhook từ PayOS (không cần auth)
 router.post('/webhook', payosController.webhook);
 
+// Return URL - xử lý khi thanh toán thành công
+router.get('/return', payosController.handleReturn);
+
+// Cancel URL - xử lý khi hủy thanh toán
+router.get('/cancel', payosController.handleCancel);
+
 
 // Middleware kiểm tra admin
 const adminOnly = (req, res, next) => {

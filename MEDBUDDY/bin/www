@@ -89,5 +89,9 @@ function onListening() {
   debug('Listening on ' + bind);
   if (typeof addr === 'object' && addr && addr.port) {
     console.log(`Server is running on port ${addr.port}`);
+    
+    // Start package management jobs
+    const { startPackageJobs } = require('../src/jobs/packageExpiryJob');
+    startPackageJobs();
   }
 }

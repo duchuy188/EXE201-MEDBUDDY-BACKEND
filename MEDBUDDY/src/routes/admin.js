@@ -23,4 +23,12 @@ router.put('/users/:id', authMiddleware, adminOnly, adminController.updateUser);
 router.patch('/users/:id/block', authMiddleware, adminOnly, adminController.blockUser);
 router.patch('/users/:id/unblock', authMiddleware, adminOnly, adminController.unblockUser);
 
+
+
+// Chạy kiểm tra gói hết hạn thủ công
+router.post('/package/check-expiry', authMiddleware, adminOnly, adminController.runPackageExpiryCheck);
+
+// Chạy kiểm tra gói sắp hết hạn thủ công
+router.post('/package/check-expiring-soon', authMiddleware, adminOnly, adminController.runPackageExpiringSoonCheck);
+
 module.exports = router;
