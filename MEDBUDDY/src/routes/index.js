@@ -13,6 +13,7 @@ const ocrRouter = require('./ocr');
 const relativePatientRouter = require('./relativePatient');
 const packageRouter = require('./package');
 const vnpayRouter = require('./vnpay');
+const bloodPressureReminderRouter = require('./bloodPressureReminder');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -51,5 +52,8 @@ router.use('/package', packageRouter);
 
 // VNPay routes
 router.use('/vnpay', vnpayRouter);
+
+// Blood Pressure Reminder routes
+router.use('/blood-pressure-reminder', bloodPressureReminderRouter);
 
 module.exports = router;

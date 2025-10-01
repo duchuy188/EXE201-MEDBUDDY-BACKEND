@@ -3,13 +3,14 @@ const mongoose = require('mongoose');
 const MedicationSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
-  dosage: { type: String, required: true },
-  form: { type: String },
+  form: { type: String }, //vien, lo
   image: { type: String },
   note: { type: String },
-  timeOfDay: { type: String }, // Sáng, Chiều, Tối
-  time: { type: String }, // Giờ uống cụ thể (HH:mm)
-  expirationDate: { type: Date }, // Hạn sử dụng
+  quantity: { type: String }, // Tổng số lượng thuốc
+  times: [{
+    time: { type: String, enum: ['Sáng', 'Chiều', 'Tối'], required: true },
+    dosage: { type: String, required: true } // Liều lượng cho từng buổi
+  }],
   createdAt: { type: Date, default: Date.now }
 });
 

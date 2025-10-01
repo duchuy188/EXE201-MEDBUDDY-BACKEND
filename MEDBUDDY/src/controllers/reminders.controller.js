@@ -15,16 +15,35 @@ exports.getReminders = async (req, res) => {
 // Thêm nhắc uống thuốc
 exports.createReminder = async (req, res) => {
   try {
+    const { medicationId, times, startDate, endDate, reminderType, repeatTimes, note, voice, status, snoozeTime } = req.body;
     // Validate required fields
-    const { medicationId, time, startDate, endDate, reminderType } = req.body;
-    if (!medicationId || !time || !startDate || !endDate || !reminderType) {
-      return res.status(400).json({ 
+    if (!medicationId || !Array.isArray(times) || times.length === 0 || !startDate || !endDate || !reminderType) {
+      return res.status(400).json({
         message: 'Thiếu thông tin bắt buộc',
-        error: 'Missing required fields: medicationId, time, startDate, endDate, reminderType'
+        error: 'Missing required fields: medicationId, times, startDate, endDate, reminderType'
       });
     }
 
-    // Validate reminder type
+    // Kiểm tra trùng lịch nhắc thuốc
+    const userIdChecked = req.user._id;
+    const existedReminder = await Reminder.findOne({
+      userId: userIdChecked,
+      medicationId,
+      $or: [
+        {
+          startDate: { $lte: endDate },
+          endDate: { $gte: startDate }
+        }
+      ]
+    });
+    if (existedReminder) {
+      return res.status(409).json({
+        message: 'Đã tồn tại lịch nhắc thuốc cho thuốc này trong khoảng thời gian này',
+        error: 'Duplicate reminder for this medication in the selected time range'
+      });
+    }
+
+    // Validate reminderType
     if (!['normal', 'voice'].includes(reminderType)) {
       return res.status(400).json({
         message: 'Loại nhắc nhở không hợp lệ',
@@ -32,26 +51,52 @@ exports.createReminder = async (req, res) => {
       });
     }
 
-    const userId = req.user._id; // Bắt buộc phải có user từ auth middleware
-    const { repeat, note, voice, speed } = req.body;
-    
-    // Create reminder instance with default note if not provided
-    const reminderNote = note || "Đã đến giờ uống thuốc rồi";
-    
-    const reminder = new Reminder({ 
-      userId, 
-      medicationId, 
-      time, 
-      repeat, 
-      note: reminderNote, 
-      startDate, 
-      endDate,
-      reminderType: reminderType || 'normal',
-      voice: voice || 'banmai',
-      speed: speed || 0
-    });
+    // Validate times array
+    const validTimes = ['Sáng', 'Chiều', 'Tối'];
+    for (const t of times) {
+      if (!t.time || !validTimes.includes(t.time)) {
+        return res.status(400).json({
+          message: 'Thời gian uống thuốc không hợp lệ',
+          error: 'Each times item must have a valid time: Sáng, Chiều, Tối'
+        });
+      }
+    }
 
-  // Không tạo audioUrl, chỉ lưu tên file voice (ví dụ: banmai.mp3)
+    // Validate voice
+    const validVoices = ['banmai', 'lannhi', 'leminh', 'myan', 'thuminh', 'giahuy', 'linhsan'];
+    let reminderVoice = null;
+    if (reminderType === 'voice') {
+      reminderVoice = voice && validVoices.includes(voice) ? voice : 'banmai';
+    }
+
+    // Validate repeatTimes array
+    let repeatTimesArr = Array.isArray(repeatTimes) ? repeatTimes : [];
+    repeatTimesArr = repeatTimesArr.map(rt => ({
+      time: rt.time,
+      taken: typeof rt.taken === 'boolean' ? rt.taken : false
+    }));
+
+    // Validate status
+    const validStatus = ['pending', 'completed', 'snoozed'];
+    const reminderStatus = validStatus.includes(status) ? status : 'pending';
+
+    const userId = req.user._id;
+    const reminderNote = note || "Đã đến giờ uống thuốc rồi";
+
+    const reminder = new Reminder({
+      userId,
+      medicationId,
+      times,
+      startDate,
+      endDate,
+      reminderType,
+      repeatTimes: repeatTimesArr,
+      note: reminderNote,
+      voice: reminderVoice,
+      isActive: true,
+      status: reminderStatus,
+      snoozeTime: snoozeTime || null
+    });
     await reminder.save();
     res.status(201).json(reminder);
   } catch (err) {
@@ -73,70 +118,35 @@ exports.getReminderById = async (req, res) => {
 // Cập nhật nhắc nhở
 exports.updateReminder = async (req, res) => {
   try {
-    const { medicationId, time, repeat, note, startDate, endDate, isActive, reminderType, voice, speed } = req.body;
+    const { medicationId, times, repeatDays, repeatTimes, note, startDate, endDate, isActive, reminderType, voice, status, snoozeTime } = req.body;
     const currentReminder = await Reminder.findById(req.params.id);
     if (!currentReminder) {
       return res.status(404).json({ message: 'Không tìm thấy nhắc nhở' });
     }
 
-    const updateData = { 
-      medicationId, 
-      time, 
-      repeat, 
-      note, 
-      startDate, 
-      endDate, 
-      isActive
+    const updateData = {
+      medicationId,
+      times,
+      repeatDays,
+      repeatTimes,
+      note,
+      startDate,
+      endDate,
+      isActive,
+      reminderType,
+      voice,
+      status,
+      snoozeTime
     };
 
-    // Update reminderType if provided
-    if (reminderType) {
-      updateData.reminderType = reminderType;
-      // Nếu chuyển sang normal, xóa các thông tin về voice
-      if (reminderType === 'normal') {
-        updateData.voice = undefined;
-        updateData.speed = undefined;
-        updateData.audioUrl = undefined;
-      }
-    }
-
-    // Xử lý voice reminder
-    if ((reminderType === 'voice' || currentReminder.reminderType === 'voice') && 
-        (note || voice || typeof speed !== 'undefined' || reminderType === 'voice')) {
-      
-      // Cập nhật voice settings nếu được cung cấp
-      if (voice) updateData.voice = voice;
-      if (typeof speed !== 'undefined') updateData.speed = speed;
-
-      // Tạo audio mới nếu có thay đổi về nội dung hoặc cài đặt voice
-      const newNote = note || currentReminder.note;
-      const newVoice = voice || currentReminder.voice;
-      const newSpeed = typeof speed !== 'undefined' ? speed : currentReminder.speed;
-
-      if (newNote !== currentReminder.note || 
-          newVoice !== currentReminder.voice || 
-          newSpeed !== currentReminder.speed ||
-          (reminderType === 'voice' && !currentReminder.audioUrl)) {
-        
-        const ttsResult = await TextToSpeechService.generateSpeech(newNote, {
-          voice: newVoice,
-          speed: newSpeed
-        });
-
-        if (ttsResult.success) {
-          updateData.audioUrl = ttsResult.audioUrl;
-        } else {
-          console.error('TTS generation failed:', ttsResult.error);
-        }
-      }
-    }
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
     const reminder = await Reminder.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
     );
-    
     if (!reminder) return res.status(404).json({ message: 'Không tìm thấy nhắc nhở' });
     res.json(reminder);
   } catch (err) {

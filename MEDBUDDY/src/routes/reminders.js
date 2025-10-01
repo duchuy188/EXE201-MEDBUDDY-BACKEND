@@ -18,5 +18,5 @@ router.put('/:id', authMiddleware, remindersController.updateReminder);
 
 // DELETE /reminders/:id – Xóa nhắc nhở
 router.delete('/:id', authMiddleware, remindersController.deleteReminder);
-
+    
 module.exports = router;
