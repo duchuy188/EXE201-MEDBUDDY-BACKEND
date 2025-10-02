@@ -201,101 +201,113 @@ exports.confirmPayment = async (req, res) => {
 
 // Webhook nhận thông báo từ PayOS
 exports.webhook = async (req, res) => {
-          // Kết thúc gói hiện tại nếu còn hiệu lực
-          const now = new Date();
-          await Payment.updateMany({ userId: payment.userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
   try {
     const { code, desc, success, data, signature } = req.body;
+    console.log('Webhook received:', req.body);
     
-    console.log('Webhook received:', { code, desc, success, data, signature });
-    
-    
-    
-    const isValid = true; 
-    
-    if (isValid) {
-     
-      console.log('Webhook received:', data);
+    try {
+      const { code, desc, success, data, signature } = req.body;
       
-     
-      const payment = await Payment.findOne({ orderCode: data.orderCode });
+      console.log('Webhook received:', { code, desc, success, data, signature });
       
-      if (payment) {
+      const isValid = true; 
+      
+      if (isValid) {
+        console.log('Webhook received:', data);
         
-        payment.payosData = data;
+        // Find the payment record first
+        const payment = await Payment.findOne({ orderCode: data.orderCode });
         
-        // Kiểm tra trạng thái thanh toán từ webhook data
-        if (data.code === '00' && (data.desc === 'Thành công' || data.desc === 'success')) {
-          payment.status = 'PAID';
-          payment.paidAt = new Date();
+        if (payment) {
+          // Now we can safely access payment.userId for ending current packages
+          const now = new Date();
+          await Payment.updateMany({ userId: payment.userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
           
-          const user = await User.findById(payment.userId);
-          const packageInfo = await Package.findById(payment.packageId);
+          payment.payosData = data;
           
-          if (user && packageInfo) {
-            // Kích hoạt gói cho user
-            try {
-              await activateUserPackage(payment.userId, payment.packageId);
-              console.log(`Package activated for user ${payment.userId}: ${packageInfo.name}`);
-            } catch (activationError) {
-              console.error('Error activating package:', activationError);
-            }
+          // Kiểm tra trạng thái thanh toán từ webhook data
+          if (data.code === '00' && (data.desc === 'Thành công' || data.desc === 'success')) {
+            payment.status = 'PAID';
+            payment.paidAt = new Date();
+            
+            const user = await User.findById(payment.userId);
+            const packageInfo = await Package.findById(payment.packageId);
+            
+            if (user && packageInfo) {
+              // Kích hoạt gói cho user
+              try {
+                await activateUserPackage(payment.userId, payment.packageId);
+                console.log(`Package activated for user ${payment.userId}: ${packageInfo.name}`);
+              } catch (activationError) {
+                console.error('Error activating package:', activationError);
+              }
 
-            // Gửi email xác nhận thanh toán thành công
-            try {
-              await sendPaymentConfirmationEmail(
-                user.email,
-                user.fullName,
-                packageInfo.name,
-                payment.amount,
-                payment.orderCode
-              );
-            } catch (emailError) {
-              console.error('Error sending confirmation email:', emailError);
+              // Gửi email xác nhận thanh toán thành công
+              try {
+                await sendPaymentConfirmationEmail(
+                  user.email,
+                  user.fullName,
+                  packageInfo.name,
+                  payment.amount,
+                  payment.orderCode
+                );
+              } catch (emailError) {
+                console.error('Error sending confirmation email:', emailError);
+              }
+            }
+            
+          } else if (data.code !== '00') {
+            payment.status = 'CANCELLED';
+            payment.cancelledAt = new Date();
+            
+            const user = await User.findById(payment.userId);
+            const packageInfo = await Package.findById(payment.packageId);
+            
+            if (user && packageInfo) {
+              try {
+                await sendPaymentFailureEmail(
+                  user.email,
+                  user.fullName,
+                  packageInfo.name,
+                  payment.amount,
+                  payment.orderCode,
+                  `Giao dịch thất bại: ${data.desc}`
+                );
+              } catch (emailError) {
+                console.error('Error sending failure email:', emailError);
+              }
             }
           }
           
-        } else if (data.code !== '00') {
-          payment.status = 'CANCELLED';
-          payment.cancelledAt = new Date();
-          
-          const user = await User.findById(payment.userId);
-          const packageInfo = await Package.findById(payment.packageId);
-          
-          if (user && packageInfo) {
-            try {
-              await sendPaymentFailureEmail(
-                user.email,
-                user.fullName,
-                packageInfo.name,
-                payment.amount,
-                payment.orderCode,
-                `Giao dịch thất bại: ${data.desc}`
-              );
-            } catch (emailError) {
-              console.error('Error sending failure email:', emailError);
-            }
-          }
+          await payment.save();
+          console.log('Payment updated:', payment.orderCode, payment.status);
+        } else {
+          console.log('Payment not found for orderCode:', data.orderCode);
         }
         
-        await payment.save();
-        console.log('Payment updated:', payment.orderCode, payment.status);
+        res.status(200).json({ 
+          message: 'Webhook processed successfully',
+          code: '00',
+          desc: 'success'
+        });
+      } else {
+        console.error('Invalid webhook signature');
+        res.status(400).json({ 
+          message: 'Invalid signature',
+          code: '01',
+          desc: 'Invalid signature'
+        });
       }
       
-      res.status(200).json({ 
-        message: 'Webhook processed successfully',
-        code: '00',
-        desc: 'success'
-      });
-    } else {
-      console.error('Invalid webhook signature');
-      res.status(400).json({ 
-        message: 'Invalid signature',
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      res.status(500).json({ 
+        message: 'Lỗi xử lý webhook', 
+        error: error.message,
         code: '01',
-        desc: 'Invalid signature'
+        desc: 'Internal server error'
       });
     }
-    
   } catch (error) {
     console.error('Webhook processing error:', error);
     res.status(500).json({ 
