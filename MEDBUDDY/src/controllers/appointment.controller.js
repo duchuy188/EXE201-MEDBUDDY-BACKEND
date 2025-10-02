@@ -6,28 +6,29 @@ const createAppointment = async (req, res) => {
         const { title, hospital, location, date, time, notes } = req.body;
         const userId = req.user._id;
 
+        // Nếu notes không có hoặc rỗng, tự động gán giá trị mặc định
+        const finalNotes = (!notes || notes.trim() === "") ? "Đã đến lịch tái khám" : notes;
+
         const appointment = new Appointment({
             title,
             hospital,
             location,
             date,
             time,
-            notes,
+            notes: finalNotes,
             userId
         });
 
         await appointment.save();
 
         // Schedule notification for the appointment
-
-            // Lấy deviceToken từ NotificationToken
-            const NotificationToken = require('../models/NotificationToken');
-            const tokenDoc = await NotificationToken.findOne({ userId });
-            if (tokenDoc && tokenDoc.deviceToken) {
-                const titleMsg = 'Lịch hẹn tái khám mới';
-                const bodyMsg = `Bạn có lịch hẹn tại ${hospital} vào ngày ${new Date(date).toLocaleDateString('vi-VN')} lúc ${time}`;
-                await sendNotification(tokenDoc.deviceToken, titleMsg, bodyMsg);
-            }
+        const NotificationToken = require('../models/NotificationToken');
+        const tokenDoc = await NotificationToken.findOne({ userId });
+        if (tokenDoc && tokenDoc.deviceToken) {
+            const titleMsg = 'Lịch hẹn tái khám mới';
+            const bodyMsg = `Bạn có lịch hẹn tại ${hospital} vào ngày ${new Date(date).toLocaleDateString('vi-VN')} lúc ${time}`;
+            await sendNotification(tokenDoc.deviceToken, titleMsg, bodyMsg);
+        }
 
         res.status(201).json({
             success: true,

@@ -4,31 +4,41 @@
  *   schemas:
  *     MedicationHistory:
  *       type: object
+ *       required:
+ *         - userId
+ *         - medicationId
+ *         - reminderId
+ *         - date
+ *         - time
  *       properties:
- *         _id:
- *           type: string
- *           description: ID tự sinh của lịch sử uống thuốc
  *         userId:
  *           type: string
  *           description: ID người dùng
  *         medicationId:
  *           type: string
  *           description: ID thuốc
- *         status:
+ *         reminderId:
  *           type: string
- *           enum: [taken, missed]
- *           description: Trạng thái (taken - đã uống, missed - bỏ quên)
+ *           description: ID nhắc nhở
+ *         date:
+ *           type: string
+ *           example: '2025-10-01'
+ *           description: Ngày uống thuốc (YYYY-MM-DD)
+ *         time:
+ *           type: string
+ *           example: '08:00'
+ *           description: Giờ uống thuốc (HH:mm)
+ *         taken:
+ *           type: boolean
+ *           default: false
+ *           description: Đã uống chưa
  *         takenAt:
  *           type: string
  *           format: date-time
- *           description: Thời gian ghi nhận
- *         note:
+ *           description: Thời điểm xác nhận uống
+ *         status:
  *           type: string
- *           description: Ghi chú
- *       example:
- *         userId: "64d1f2c2e1b2a3c4d5e6f7a8"
- *         medicationId: "64d1f2c2e1b2a3c4d5e6f7b9"
- *         status: "taken"
- *         takenAt: "2025-08-09T08:00:00.000Z"
- *         note: "Đã uống đúng giờ"
+ *           enum: [on_time, late, missed]
+ *           default: missed
+ *           description: Trạng thái uống thuốc
  */

@@ -10,10 +10,11 @@ exports.createMedicationsFromOcr = async (req, res) => {
     const docs = medicines.map(med => ({
       userId,
       name: med.name,
-      dosage: med.quantity || med.dosage || '',
       form: med.form || '',
       image: imageUrl || '',
       note: med.usage || med.note || '',
+      quantity: med.quantity || '', // tổng số lượng thuốc
+      times: med.times || [] // mảng các buổi uống và liều lượng
       // Có thể lưu rawText vào note hoặc trường riêng nếu muốn
     }));
     const result = await require('../models/Medication').insertMany(docs);
@@ -39,8 +40,8 @@ exports.getMedications = async (req, res) => {
 exports.createMedication = async (req, res) => {
   try {
     const userId = req.user?._id || req.body.userId;
-    const { name, dosage, form, image, note, timeOfDay, time, expirationDate } = req.body;
-    const medication = new Medication({ userId, name, dosage, form, image, note, timeOfDay, time, expirationDate });
+  const { name, form, image, note, times, quantity } = req.body;
+  const medication = new Medication({ userId, name, form, image, note, times, quantity });
     await medication.save();
     res.status(201).json(medication);
   } catch (err) {
@@ -62,10 +63,10 @@ exports.getMedicationById = async (req, res) => {
 // Cập nhật thông tin thuốc
 exports.updateMedication = async (req, res) => {
   try {
-    const { name, dosage, form, image, note, timeOfDay, time, expirationDate } = req.body;
+    const { name, form, image, note, times, quantity } = req.body;
     const medication = await Medication.findByIdAndUpdate(
       req.params.id,
-      { name, dosage, form, image, note, timeOfDay, time, expirationDate },
+      { name, form, image, note, times, quantity },
       { new: true }
     );
     if (!medication) return res.status(404).json({ message: 'Không tìm thấy thuốc' });

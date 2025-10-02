@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 var createError = require('http-errors');
 var express = require('express');
@@ -30,6 +29,7 @@ var authRouter = require('./src/routes/auth.route');
 var adminRouter = require('./src/routes/admin');
 var alertsRouter = require('./src/routes/alerts');
 var bloodPressureRouter = require('./src/routes/bloodPressure');
+var bloodPressureReminderRouter = require('./src/routes/bloodPressureReminder');
 var medicationsRouter = require('./src/routes/medications');
 var medicationsHistoryRouter = require('./src/routes/medicationsHistory');
 var notificationsRouter = require('./src/routes/notifications');
@@ -84,6 +84,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/blood-pressure', bloodPressureRouter);
+app.use('/api/blood-pressure-reminder', bloodPressureReminderRouter);
 app.use('/api/medications', medicationsRouter);
 app.use('/api/medications-history', medicationsHistoryRouter);
 app.use('/api/notifications', notificationsRouter);

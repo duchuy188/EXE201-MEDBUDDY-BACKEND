@@ -1,13 +1,17 @@
 const express = require('express');
-
 const router = express.Router();
-const authMiddleware = require('../middlewares/auth.middleware');
 const medicationHistoryController = require('../controllers/medicationHistory.controller');
 
-// POST /medications/history – Ghi nhận đã uống thuốc/đã bỏ quên
-router.post('/history', authMiddleware, medicationHistoryController.createMedicationHistory);
+// Tạo lịch sử uống thuốc mới
+router.post('/', medicationHistoryController.createHistory);
 
-// GET /medications/history – Xem lại lịch sử uống thuốc
-router.get('/history', authMiddleware, medicationHistoryController.getMedicationHistory);
+// Lấy lịch sử uống thuốc theo user
+router.get('/user/:userId', medicationHistoryController.getHistoryByUser);
+
+// Cập nhật trạng thái uống thuốc
+router.put('/:id', medicationHistoryController.updateHistory);
+
+// Xóa lịch sử uống thuốc
+router.delete('/:id', medicationHistoryController.deleteHistory);
 
 module.exports = router;
