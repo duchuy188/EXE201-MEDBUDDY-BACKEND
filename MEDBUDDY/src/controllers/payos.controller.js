@@ -6,6 +6,63 @@ const { sendPaymentConfirmationEmail, sendPaymentFailureEmail } = require('../se
 const { activateUserPackage } = require('../services/packageService');
 const { formatVN, formatPackageExpiry } = require('../utils/dateHelper');
 
+// Kích hoạt gói dùng thử miễn phí
+exports.activateTrialPackage = async (req, res) => {
+  try {
+    const { packageId } = req.body;
+    const userId = req.user._id;
+    // Kiểm tra user đã từng dùng gói thử chưa
+    const existedTrial = await Payment.findOne({ userId, packageId, paymentMethod: 'TRIAL' });
+    if (existedTrial) {
+      return res.status(400).json({ message: 'Bạn chỉ được sử dụng gói dùng thử một lần duy nhất.' });
+    }
+    // Kết thúc gói hiện tại nếu còn hiệu lực
+    const now = new Date();
+    await Payment.updateMany({ userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
+    const packageInfo = await Package.findById(packageId);
+    if (!packageInfo || packageInfo.price !== 0) {
+      return res.status(400).json({ message: 'Chỉ áp dụng cho gói dùng thử miễn phí.' });
+    }
+    // Tính ngày bắt đầu và kết thúc
+    const startDate = new Date();
+    let duration = packageInfo.duration || 7;
+    let unit = packageInfo.unit || 'day';
+    let endDate = new Date(startDate);
+    if (unit === 'month') {
+      endDate.setMonth(endDate.getMonth() + duration);
+    } else if (unit === 'day') {
+      endDate.setDate(endDate.getDate() + duration);
+    } else if (unit === 'year') {
+      endDate.setFullYear(endDate.getFullYear() + duration);
+    }
+    // Tạo payment record với status PAID
+    const payment = new Payment({
+      orderCode: Date.now(),
+      userId,
+      packageId,
+      amount: 0,
+      description: packageInfo.name,
+      status: 'PAID',
+      paymentMethod: 'TRIAL',
+      paidAt: startDate,
+      startDate,
+      endDate
+    });
+    await payment.save();
+    // Kích hoạt gói cho user
+    await activateUserPackage(userId, packageId);
+    res.json({
+      message: 'Kích hoạt gói dùng thử thành công',
+      payment,
+      startDate,
+      endDate
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi kích hoạt gói dùng thử', error: error.message });
+  }
+};
+
+
 // Tạo payment link
 exports.createPaymentLink = async (req, res) => {
   try {
@@ -19,12 +76,16 @@ exports.createPaymentLink = async (req, res) => {
     }
     
     
+    const scheme = 'medbuddy://';
+    const orderCode = Date.now();
+    const returnUrl = `${scheme}payment-success?orderCode=${orderCode}`;
+    const cancelUrl = `${scheme}payment-cancel?orderCode=${orderCode}`;
     const order = {
       amount: packageInfo.price,
       description: packageInfo.name.length > 25 ? packageInfo.name.substring(0, 25) : packageInfo.name,
-      orderCode: Date.now(), 
-      returnUrl: process.env.PAYOS_RETURN_URL,
-      cancelUrl: process.env.PAYOS_CANCEL_URL,
+      orderCode,
+      returnUrl,
+      cancelUrl,
       items: [{
         name: packageInfo.name.length > 25 ? packageInfo.name.substring(0, 25) : packageInfo.name,
         quantity: 1,
@@ -63,6 +124,9 @@ exports.createPaymentLink = async (req, res) => {
 
 // Xác nhận thanh toán
 exports.confirmPayment = async (req, res) => {
+  // Kết thúc gói hiện tại nếu còn hiệu lực
+  const now = new Date();
+  await Payment.updateMany({ userId: payment.userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
   try {
     const { orderCode } = req.body;
     
@@ -137,6 +201,9 @@ exports.confirmPayment = async (req, res) => {
 
 // Webhook nhận thông báo từ PayOS
 exports.webhook = async (req, res) => {
+          // Kết thúc gói hiện tại nếu còn hiệu lực
+          const now = new Date();
+          await Payment.updateMany({ userId: payment.userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
   try {
     const { code, desc, success, data, signature } = req.body;
     
