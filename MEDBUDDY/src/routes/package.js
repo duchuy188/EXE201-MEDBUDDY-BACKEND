@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const packageController = require('../controllers/package.controller');
+const payosController = require('../controllers/payos.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 
 // Tạo các gói dịch vụ mặc định
@@ -15,5 +16,7 @@ router.post('/', authMiddleware, packageController.addPackage);
 router.delete('/:id', authMiddleware, packageController.deletePackage);
 // Lấy danh sách tất cả các gói dịch vụ
 router.get('/', packageController.getAllPackages);
+// Kích hoạt gói dùng thử miễn phí
+router.post('/activate-trial', authMiddleware, payosController.activateTrialPackage);
 
 module.exports = router;

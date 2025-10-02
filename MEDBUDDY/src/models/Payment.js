@@ -39,6 +39,12 @@ const paymentSchema = new mongoose.Schema({
   paidAt: {
     type: Date
   },
+    startDate: {
+      type: Date
+    },
+    endDate: {
+      type: Date
+    },
   cancelledAt: {
     type: Date
   },

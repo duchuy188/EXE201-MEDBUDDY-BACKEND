@@ -42,4 +42,6 @@ router.get('/admin/dashboard-stats', authMiddleware, adminOnly, payosController.
 // Chi tiết giao dịch
 router.get('/admin/payment/:orderCode', authMiddleware, adminOnly, payosController.getPaymentDetail);
 
+router.post('/activate-trial', authMiddleware, payosController.activateTrialPackage);
+
 module.exports = router;

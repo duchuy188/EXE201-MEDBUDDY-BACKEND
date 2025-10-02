@@ -6,6 +6,63 @@ const { sendPaymentConfirmationEmail, sendPaymentFailureEmail } = require('../se
 const { activateUserPackage } = require('../services/packageService');
 const { formatVN, formatPackageExpiry } = require('../utils/dateHelper');
 
+// Kích hoạt gói dùng thử miễn phí
+exports.activateTrialPackage = async (req, res) => {
+  try {
+    const { packageId } = req.body;
+    const userId = req.user._id;
+    // Kiểm tra user đã từng dùng gói thử chưa
+    const existedTrial = await Payment.findOne({ userId, packageId, paymentMethod: 'TRIAL' });
+    if (existedTrial) {
+      return res.status(400).json({ message: 'Bạn chỉ được sử dụng gói dùng thử một lần duy nhất.' });
+    }
+    // Kết thúc gói hiện tại nếu còn hiệu lực
+    const now = new Date();
+    await Payment.updateMany({ userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
+    const packageInfo = await Package.findById(packageId);
+    if (!packageInfo || packageInfo.price !== 0) {
+      return res.status(400).json({ message: 'Chỉ áp dụng cho gói dùng thử miễn phí.' });
+    }
+    // Tính ngày bắt đầu và kết thúc
+    const startDate = new Date();
+    let duration = packageInfo.duration || 7;
+    let unit = packageInfo.unit || 'day';
+    let endDate = new Date(startDate);
+    if (unit === 'month') {
+      endDate.setMonth(endDate.getMonth() + duration);
+    } else if (unit === 'day') {
+      endDate.setDate(endDate.getDate() + duration);
+    } else if (unit === 'year') {
+      endDate.setFullYear(endDate.getFullYear() + duration);
+    }
+    // Tạo payment record với status PAID
+    const payment = new Payment({
+      orderCode: Date.now(),
+      userId,
+      packageId,
+      amount: 0,
+      description: packageInfo.name,
+      status: 'PAID',
+      paymentMethod: 'TRIAL',
+      paidAt: startDate,
+      startDate,
+      endDate
+    });
+    await payment.save();
+    // Kích hoạt gói cho user
+    await activateUserPackage(userId, packageId);
+    res.json({
+      message: 'Kích hoạt gói dùng thử thành công',
+      payment,
+      startDate,
+      endDate
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Lỗi kích hoạt gói dùng thử', error: error.message });
+  }
+};
+
+
 // Tạo payment link
 exports.createPaymentLink = async (req, res) => {
   try {
@@ -19,12 +76,16 @@ exports.createPaymentLink = async (req, res) => {
     }
     
     
+    const scheme = 'medbuddy://';
+    const orderCode = Date.now();
+    const returnUrl = `${scheme}payment-success?orderCode=${orderCode}`;
+    const cancelUrl = `${scheme}payment-cancel?orderCode=${orderCode}`;
     const order = {
       amount: packageInfo.price,
       description: packageInfo.name.length > 25 ? packageInfo.name.substring(0, 25) : packageInfo.name,
-      orderCode: Date.now(), 
-      returnUrl: process.env.PAYOS_RETURN_URL,
-      cancelUrl: process.env.PAYOS_CANCEL_URL,
+      orderCode,
+      returnUrl,
+      cancelUrl,
       items: [{
         name: packageInfo.name.length > 25 ? packageInfo.name.substring(0, 25) : packageInfo.name,
         quantity: 1,
@@ -63,6 +124,9 @@ exports.createPaymentLink = async (req, res) => {
 
 // Xác nhận thanh toán
 exports.confirmPayment = async (req, res) => {
+  // Kết thúc gói hiện tại nếu còn hiệu lực
+  const now = new Date();
+  await Payment.updateMany({ userId: payment.userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
   try {
     const { orderCode } = req.body;
     
@@ -139,96 +203,111 @@ exports.confirmPayment = async (req, res) => {
 exports.webhook = async (req, res) => {
   try {
     const { code, desc, success, data, signature } = req.body;
+    console.log('Webhook received:', req.body);
     
-    console.log('Webhook received:', { code, desc, success, data, signature });
-    
-    
-    
-    const isValid = true; 
-    
-    if (isValid) {
-     
-      console.log('Webhook received:', data);
+    try {
+      const { code, desc, success, data, signature } = req.body;
       
-     
-      const payment = await Payment.findOne({ orderCode: data.orderCode });
+      console.log('Webhook received:', { code, desc, success, data, signature });
       
-      if (payment) {
+      const isValid = true; 
+      
+      if (isValid) {
+        console.log('Webhook received:', data);
         
-        payment.payosData = data;
+        // Find the payment record first
+        const payment = await Payment.findOne({ orderCode: data.orderCode });
         
-        // Kiểm tra trạng thái thanh toán từ webhook data
-        if (data.code === '00' && (data.desc === 'Thành công' || data.desc === 'success')) {
-          payment.status = 'PAID';
-          payment.paidAt = new Date();
+        if (payment) {
+          // Now we can safely access payment.userId for ending current packages
+          const now = new Date();
+          await Payment.updateMany({ userId: payment.userId, status: 'PAID', endDate: { $gt: now } }, { endDate: now });
           
-          const user = await User.findById(payment.userId);
-          const packageInfo = await Package.findById(payment.packageId);
+          payment.payosData = data;
           
-          if (user && packageInfo) {
-            // Kích hoạt gói cho user
-            try {
-              await activateUserPackage(payment.userId, payment.packageId);
-              console.log(`Package activated for user ${payment.userId}: ${packageInfo.name}`);
-            } catch (activationError) {
-              console.error('Error activating package:', activationError);
-            }
+          // Kiểm tra trạng thái thanh toán từ webhook data
+          if (data.code === '00' && (data.desc === 'Thành công' || data.desc === 'success')) {
+            payment.status = 'PAID';
+            payment.paidAt = new Date();
+            
+            const user = await User.findById(payment.userId);
+            const packageInfo = await Package.findById(payment.packageId);
+            
+            if (user && packageInfo) {
+              // Kích hoạt gói cho user
+              try {
+                await activateUserPackage(payment.userId, payment.packageId);
+                console.log(`Package activated for user ${payment.userId}: ${packageInfo.name}`);
+              } catch (activationError) {
+                console.error('Error activating package:', activationError);
+              }
 
-            // Gửi email xác nhận thanh toán thành công
-            try {
-              await sendPaymentConfirmationEmail(
-                user.email,
-                user.fullName,
-                packageInfo.name,
-                payment.amount,
-                payment.orderCode
-              );
-            } catch (emailError) {
-              console.error('Error sending confirmation email:', emailError);
+              // Gửi email xác nhận thanh toán thành công
+              try {
+                await sendPaymentConfirmationEmail(
+                  user.email,
+                  user.fullName,
+                  packageInfo.name,
+                  payment.amount,
+                  payment.orderCode
+                );
+              } catch (emailError) {
+                console.error('Error sending confirmation email:', emailError);
+              }
+            }
+            
+          } else if (data.code !== '00') {
+            payment.status = 'CANCELLED';
+            payment.cancelledAt = new Date();
+            
+            const user = await User.findById(payment.userId);
+            const packageInfo = await Package.findById(payment.packageId);
+            
+            if (user && packageInfo) {
+              try {
+                await sendPaymentFailureEmail(
+                  user.email,
+                  user.fullName,
+                  packageInfo.name,
+                  payment.amount,
+                  payment.orderCode,
+                  `Giao dịch thất bại: ${data.desc}`
+                );
+              } catch (emailError) {
+                console.error('Error sending failure email:', emailError);
+              }
             }
           }
           
-        } else if (data.code !== '00') {
-          payment.status = 'CANCELLED';
-          payment.cancelledAt = new Date();
-          
-          const user = await User.findById(payment.userId);
-          const packageInfo = await Package.findById(payment.packageId);
-          
-          if (user && packageInfo) {
-            try {
-              await sendPaymentFailureEmail(
-                user.email,
-                user.fullName,
-                packageInfo.name,
-                payment.amount,
-                payment.orderCode,
-                `Giao dịch thất bại: ${data.desc}`
-              );
-            } catch (emailError) {
-              console.error('Error sending failure email:', emailError);
-            }
-          }
+          await payment.save();
+          console.log('Payment updated:', payment.orderCode, payment.status);
+        } else {
+          console.log('Payment not found for orderCode:', data.orderCode);
         }
         
-        await payment.save();
-        console.log('Payment updated:', payment.orderCode, payment.status);
+        res.status(200).json({ 
+          message: 'Webhook processed successfully',
+          code: '00',
+          desc: 'success'
+        });
+      } else {
+        console.error('Invalid webhook signature');
+        res.status(400).json({ 
+          message: 'Invalid signature',
+          code: '01',
+          desc: 'Invalid signature'
+        });
       }
       
-      res.status(200).json({ 
-        message: 'Webhook processed successfully',
-        code: '00',
-        desc: 'success'
-      });
-    } else {
-      console.error('Invalid webhook signature');
-      res.status(400).json({ 
-        message: 'Invalid signature',
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      res.status(500).json({ 
+        message: 'Lỗi xử lý webhook', 
+        error: error.message,
         code: '01',
-        desc: 'Invalid signature'
+        desc: 'Internal server error'
       });
     }
-    
   } catch (error) {
     console.error('Webhook processing error:', error);
     res.status(500).json({ 
