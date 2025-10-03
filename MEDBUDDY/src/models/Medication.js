@@ -11,6 +11,8 @@ const MedicationSchema = new mongoose.Schema({
     time: { type: String, enum: ['Sáng', 'Chiều', 'Tối'], required: true },
     dosage: { type: String, required: true } // Liều lượng cho từng buổi
   }],
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false }, // Người tạo thuốc
+  createdByType: { type: String, enum: ['patient', 'relative'], required: false }, // Loại người tạo
   createdAt: { type: Date, default: Date.now }
 });
 

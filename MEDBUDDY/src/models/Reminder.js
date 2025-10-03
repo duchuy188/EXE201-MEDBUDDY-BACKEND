@@ -23,7 +23,9 @@ const ReminderSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   status: { type: String, enum: ['pending', 'completed', 'snoozed'], default: 'pending' }, // Trạng thái nhắc nhở
-  snoozeTime: { type: Date, required: false } // Thời gian nhắc lại nếu chọn "Hãy nhắc tôi sau"
+  snoozeTime: { type: Date, required: false }, // Thời gian nhắc lại nếu chọn "Hãy nhắc tôi sau"
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false }, // Người tạo lịch
+  createdByType: { type: String, enum: ['patient', 'relative'], required: false } // Loại người tạo
 });
 
 module.exports = mongoose.model('Reminder', ReminderSchema);

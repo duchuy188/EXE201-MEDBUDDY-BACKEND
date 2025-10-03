@@ -17,6 +17,10 @@ const relativePatientSchema = new mongoose.Schema({
     enum: ['pending', 'accepted', 'rejected'],
     default: 'pending',
   },
+  permissions: [{
+    type: String,
+    enum: ['view_medical_records', 'schedule_medication', 'schedule_appointment', 'manage_health_data']
+  }],
   otp: {
     type: String,
     required: false,

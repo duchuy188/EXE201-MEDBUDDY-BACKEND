@@ -33,7 +33,17 @@ const appointmentSchema = new mongoose.Schema(
             type: String,
             enum: ['pending', 'completed', 'cancelled'],
             default: 'pending'
-        }
+        },
+        createdBy: { 
+            type: mongoose.Schema.Types.ObjectId, 
+            ref: 'User', 
+            required: false 
+        }, // Người tạo lịch
+        createdByType: { 
+            type: String, 
+            enum: ['patient', 'relative'], 
+            required: false 
+        } // Loại người tạo
     },
     {
         timestamps: true
