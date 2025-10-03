@@ -12,6 +12,7 @@ exports.createDefaultPackages = async (req, res) => {
       'Cảnh báo huyết áp bất thường',
       'Phân tích đơn thuốc',
       'Hẹn tái khám',
+      'Phân tích AI huyết áp',
     ];
     const packages = [
       {
@@ -45,6 +46,7 @@ exports.createDefaultPackages = async (req, res) => {
     return res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };
+
 
 // Chỉnh sửa gói dịch vụ (chỉ admin)
 exports.updatePackage = async (req, res) => {

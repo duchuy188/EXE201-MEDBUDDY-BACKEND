@@ -7,6 +7,7 @@ const authMiddleware = require('../middlewares/auth.middleware');
 // Tạo các gói dịch vụ mặc định
 router.post('/create', packageController.createDefaultPackages);
 
+
 // Chỉnh sửa gói dịch vụ (chỉ admin)
 router.put('/:id', authMiddleware, packageController.updatePackage);
 
