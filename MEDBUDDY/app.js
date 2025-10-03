@@ -36,6 +36,8 @@ var notificationsRouter = require('./src/routes/notifications');
 var remindersRouter = require('./src/routes/reminders');
 var appointmentsRouter = require('./src/routes/appointments');
 var payosRouter = require('./src/routes/payos');
+var userPackageRouter = require('./src/routes/userPackage');
+var packageRouter = require('./src/routes/package');
 
 var app = express();
 
@@ -91,6 +93,8 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/reminders', remindersRouter);
 app.use('/api/appointments', appointmentsRouter);
 app.use('/api/payos', payosRouter);
+app.use('/api/user-package', userPackageRouter);
+app.use('/api/package', packageRouter);
 
 // Swagger UI route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

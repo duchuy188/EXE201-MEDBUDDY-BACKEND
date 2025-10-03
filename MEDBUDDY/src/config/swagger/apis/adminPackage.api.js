@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /admin/package/check-expiry:
+ * /api/admin/package/check-expiry:
  *   post:
  *     tags: [AdminPackage]
  *     summary: Chạy kiểm tra gói hết hạn thủ công (Admin only)
@@ -54,7 +54,7 @@
 
 /**
  * @swagger
- * /admin/package/check-expiring-soon:
+ * /api/admin/package/check-expiring-soon:
  *   post:
  *     tags: [AdminPackage]
  *     summary: Chạy kiểm tra gói sắp hết hạn thủ công (Admin only)
