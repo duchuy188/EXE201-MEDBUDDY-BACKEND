@@ -11,6 +11,11 @@ exports.ocrPrescription = async (req, res) => {
       return res.status(400).json({ message: 'No image uploaded' });
     }
 
+    // Debug Cloudinary config
+    console.log('Cloudinary Config Check:');
+    console.log('CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME);
+    console.log('API_KEY:', process.env.CLOUDINARY_API_KEY ? 'Set' : 'Not set');
+    console.log('API_SECRET:', process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Not set');
 
     // Upload ảnh lên Cloudinary
     let imageUrl = '';
@@ -20,7 +25,9 @@ exports.ocrPrescription = async (req, res) => {
       imageUrl = uploadResult.secure_url;
       publicId = uploadResult.public_id;
     } catch (err) {
-      return res.status(500).json({ message: 'Upload image to Cloudinary failed', error: err.message });
+      console.error('Cloudinary upload error:', err);
+      // Không dừng process, tiếp tục OCR mà không có imageUrl
+      console.log('Continuing OCR without image upload...');
     }
 
     const { data: { text } } = await Tesseract.recognize(req.file.buffer, 'vie+eng', {
@@ -211,11 +218,53 @@ exports.ocrPrescription = async (req, res) => {
       medicines: result,
       rawText: text, // Để debug
       totalFound: result.length,
-      imageUrl
+      imageUrl: imageUrl || 'Image upload failed, but OCR succeeded'
     });
     
   } catch (error) {
     console.error('OCR Error:', error);
     res.status(500).json({ message: 'OCR failed', error: error.message });
+  }
+};
+
+// Test Cloudinary connection
+exports.testCloudinary = async (req, res) => {
+  try {
+    console.log('Testing Cloudinary connection...');
+    console.log('CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME);
+    console.log('API_KEY:', process.env.CLOUDINARY_API_KEY ? 'Set' : 'Not set');
+    console.log('API_SECRET:', process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Not set');
+
+    // Test với một file buffer đơn giản
+    const testBuffer = Buffer.from('test image data', 'utf8');
+    
+    const uploadResult = await uploadImage(testBuffer, { 
+      folder: 'test',
+      public_id: 'test_connection',
+      overwrite: true,
+      resource_type: 'raw' // Upload as raw file for testing
+    });
+    
+    res.json({
+      success: true,
+      message: 'Cloudinary connection successful',
+      result: {
+        public_id: uploadResult.public_id,
+        secure_url: uploadResult.secure_url,
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME
+      }
+    });
+  } catch (error) {
+    console.error('Cloudinary test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Cloudinary connection failed',
+      error: error.message,
+      config: {
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        has_api_key: !!process.env.CLOUDINARY_API_KEY,
+        has_api_secret: !!process.env.CLOUDINARY_API_SECRET
+      }
+    });
   }
 };

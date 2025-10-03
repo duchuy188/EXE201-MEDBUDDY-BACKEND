@@ -7,4 +7,7 @@ const ocrController = require('../controllers/ocr.controller');
 // POST /api/ocr (có phân quyền)
 router.post('/', auth, upload.single('image'), ocrController.ocrPrescription);
 
+// GET /api/ocr/test-cloudinary (test connection)
+router.get('/test-cloudinary', ocrController.testCloudinary);
+
 module.exports = router;
