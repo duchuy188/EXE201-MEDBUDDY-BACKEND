@@ -14,6 +14,7 @@ const relativePatientRouter = require('./relativePatient');
 const packageRouter = require('./package');
 const vnpayRouter = require('./vnpay');
 const bloodPressureReminderRouter = require('./bloodPressureReminder');
+const bloodPressureAIRouter = require('./bloodPressureAI');
 const payosRouter = require('./payos');
 const userPackageRouter = require('./userPackage');
 const adminRouter = require('./admin');
@@ -34,6 +35,9 @@ router.use('/reminders', remindersRouter);
 
 // Blood Pressure routes
 router.use('/blood-pressure', bloodPressureRouter);
+
+// Blood Pressure AI routes
+router.use('/blood-pressure/ai', bloodPressureAIRouter);
 
 // Notification routes
 router.use('/notifications', notificationsRouter);

@@ -3,51 +3,50 @@ const Package = require("../models/Package");
 // Tạo các gói dịch vụ mặc định
 exports.createDefaultPackages = async (req, res) => {
   try {
-    const result = await Package.create(req.body);
-    // const existed = await Package.find();
-    // if (existed && existed.length > 0) {
-    //   return res.status(400).json({ message: 'Đã có các gói dịch vụ, không thể tạo lại.' });
-    // }
-    // const features = [
-    //   'Biểu đồ huyết áp hàng tuần',
-    //   'Cảnh báo huyết áp bất thường',
-    //   'Phân tích đơn thuốc',
-    //   'Hẹn tái khám',
-    // ];
-    // const packages = [
-    //   {
-    //     name: 'GÓI HAP DÙNG THỬ',
-    //     description: 'Gói dùng thử miễn phí trong 1 tuần đầu tiên',
-    //     price: 0,
-    //     duration: 7,
-    //     unit: 'day',
-    //     features,
-    //   },
-    //   {
-    //     name: 'GÓI HAP+ CƠ BẢN',
-    //     description: 'Gói cơ bản sử dụng AI nhận diện hóa đơn, thanh toán theo tháng',
-    //     price: 19000,
-    //     duration: 1,
-    //     unit: 'month',
-    //     features,
-    //   },
-    //   {
-    //     name: 'GÓI HAP+ NÂNG CAO',
-    //     description: 'Gói nâng cao sử dụng AI nhận diện hóa đơn, thanh toán theo năm',
-    //     price: 199000,
-    //     duration: 1,
-    //     unit: 'year',
-    //     features,
-    //   },
-    // ];
-    // const result = await Package.insertMany(packages);
-    return res
-      .status(201)
-      .json({ message: "Tạo gói dịch vụ thành công", data: result });
+    const existed = await Package.find();
+    if (existed && existed.length > 0) {
+      return res.status(400).json({ message: 'Đã có các gói dịch vụ, không thể tạo lại.' });
+    }
+    const features = [
+      'Biểu đồ huyết áp hàng tuần',
+      'Cảnh báo huyết áp bất thường',
+      'Phân tích đơn thuốc',
+      'Hẹn tái khám',
+      'Phân tích AI huyết áp',
+    ];
+    const packages = [
+      {
+        name: 'GÓI HAP DÙNG THỬ',
+        description: 'Gói dùng thử miễn phí trong 1 tuần đầu tiên',
+        price: 0,
+        duration: 7,
+        unit: 'day',
+        features,
+      },
+      {
+        name: 'GÓI HAP+ CƠ BẢN',
+        description: 'Gói cơ bản sử dụng AI nhận diện hóa đơn, thanh toán theo tháng',
+        price: 19000,
+        duration: 1,
+        unit: 'month',
+        features,
+      },
+      {
+        name: 'GÓI HAP+ NÂNG CAO',
+        description: 'Gói nâng cao sử dụng AI nhận diện hóa đơn, thanh toán theo năm',
+        price: 199000,
+        duration: 1,
+        unit: 'year',
+        features,
+      },
+    ];
+    const result = await Package.insertMany(packages);
+    return res.status(201).json({ message: 'Tạo gói dịch vụ thành công', data: result });
   } catch (err) {
     return res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
+
 
 // Chỉnh sửa gói dịch vụ (chỉ admin)
 exports.updatePackage = async (req, res) => {

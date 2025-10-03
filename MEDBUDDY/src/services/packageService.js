@@ -2,6 +2,7 @@
 const Package = require("../models/Package");
 const { now, addDays, addMonths, addYears, formatVN, formatPackageExpiry } = require("../utils/dateHelper");
 
+
 // Kích hoạt gói cho user sau khi thanh toán thành công
 async function activateUserPackage(userId, packageId) {
   try {
@@ -10,6 +11,7 @@ async function activateUserPackage(userId, packageId) {
     if (!packageInfo) {
       throw new Error("Package không tồn tại");
     }
+    
 
  
     const currentUser = await User.findById(userId);
@@ -128,6 +130,7 @@ async function getActivePackage(userId) {
       return null;
     }
 
+
     return user.activePackage;
   } catch (error) {
     console.error("Error getting active package:", error);
@@ -136,18 +139,20 @@ async function getActivePackage(userId) {
 }
 
 // Kiểm tra user có quyền sử dụng feature không
-async function hasFeatureAccess(userId, feature) {
+async function hasFeatureAccess(userId, featureName) {
   try {
     const activePackage = await getActivePackage(userId);
     
-    if (!activePackage) {
+    
+    // Nếu không có gói active hoặc gói không có tính năng đó, từ chối truy cập
+    if (!activePackage || !activePackage.features.includes(featureName)) {
       return false;
     }
 
-    return activePackage.features.includes(feature);
+    return true;
   } catch (error) {
     console.error("Error checking feature access:", error);
-    return false;
+    throw error;
   }
 }
 
