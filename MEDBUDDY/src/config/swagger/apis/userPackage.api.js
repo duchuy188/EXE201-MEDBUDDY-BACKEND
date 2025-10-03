@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /user-package/my-package:
+ * /api/user-package/my-package:
  *   get:
  *     tags: [UserPackage]
  *     summary: Lấy gói dịch vụ active của user hiện tại
@@ -69,7 +69,7 @@
 
 /**
  * @swagger
- * /user-package/check-feature/{feature}:
+ * /api/user-package/check-feature/{feature}:
  *   get:
  *     tags: [UserPackage]
  *     summary: Kiểm tra quyền sử dụng feature
@@ -108,7 +108,7 @@
 
 /**
  * @swagger
- * /user-package/my-history:
+ * /api/user-package/my-history:
  *   get:
  *     tags: [UserPackage]
  *     summary: Lấy lịch sử gói dịch vụ của user
@@ -165,7 +165,7 @@
 
 /**
  * @swagger
- * /user-package/admin/cancel/{userId}:
+ * /api/user-package/admin/cancel/{userId}:
  *   put:
  *     tags: [UserPackage]
  *     summary: Hủy gói của user (Admin only)
@@ -208,7 +208,7 @@
 
 /**
  * @swagger
- * /user-package/admin/extend/{userId}:
+ * /api/user-package/admin/extend/{userId}:
  *   put:
  *     tags: [UserPackage]
  *     summary: Gia hạn gói của user (Admin only)
@@ -273,7 +273,7 @@
 
 /**
  * @swagger
- * /user-package/admin/stats:
+ * /api/user-package/admin/stats:
  *   get:
  *     tags: [UserPackage]
  *     summary: Thống kê gói dịch vụ (Admin only)
@@ -307,7 +307,7 @@
 
 /**
  * @swagger
- * /user-package/admin/user/{userId}:
+ * /api/user-package/admin/user/{userId}:
  *   get:
  *     tags: [UserPackage]
  *     summary: Lấy thông tin chi tiết user và gói (Admin only)
