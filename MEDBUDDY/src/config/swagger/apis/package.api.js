@@ -7,7 +7,7 @@
 
 /**
  * @swagger
- * /package/create:
+ * /api/package/create:
  *   post:
  *     tags: [Package]
  *     summary: Khởi tạo 3 gói dịch vụ mặc định (dùng thử, cơ bản, nâng cao)
@@ -52,7 +52,7 @@
 
 /**
  * @swagger
- * /package:
+ * /api/package:
  *   post:
  *     tags: [Package]
  *     summary: Thêm mới gói dịch vụ (chỉ admin)
@@ -91,7 +91,7 @@
 
 /**
  * @swagger
- * /package/{id}:
+ * /api/package/{id}:
  *   put:
  *     tags: [Package]
  *     summary: Chỉnh sửa thông tin gói dịch vụ (chỉ admin)
@@ -139,7 +139,7 @@
 
 /**
  * @swagger
- * /package/{id}:
+ * /api/package/{id}:
  *   delete:
  *     tags: [Package]
  *     summary: Xóa gói dịch vụ (chỉ admin)
@@ -165,7 +165,7 @@
 
 /**
  * @swagger
- * /package:
+ * /api/package:
  *   get:
  *     tags: [Package]
  *     summary: Lấy danh sách tất cả các gói dịch vụ
