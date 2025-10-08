@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const relativePatientController = require('../controllers/relativePatient.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
+const { requireFeatureForUser } = require('../middlewares/packageAccess.middleware');
+const upload = require('../middlewares/upload.middleware');
 
 // API khởi tạo 3 gói dịch vụ
 router.post('/create-packages', relativePatientController.createDefaultPackages);
@@ -76,6 +78,35 @@ router.get('/patients/:patientId/medications', authMiddleware, relativePatientCo
 // Thêm thuốc mới cho bệnh nhân
 router.post('/patients/:patientId/medications', authMiddleware, relativePatientController.createMedicationForPatient);
 
+// Người thân tạo link thanh toán để mua gói cho bệnh nhân
+router.post('/patients/:patientId/purchase-package', authMiddleware, relativePatientController.createPaymentLinkForPatient);
+
+// Lấy lịch sử huyết áp của bệnh nhân (cho người thân)
+router.get('/patients/:patientId/blood-pressures', authMiddleware, relativePatientController.getPatientBloodPressures);
+
+// Lấy lần đo huyết áp mới nhất của bệnh nhân (cho người thân)
+router.get('/patients/:patientId/blood-pressures/latest', authMiddleware, relativePatientController.getPatientLatestBloodPressure);
+
+// Lấy tổng quan tuần uống thuốc của bệnh nhân (cho người thân)
+router.get('/patients/:patientId/medication-history/weekly', authMiddleware, relativePatientController.getPatientWeeklyOverview);
+
+// Lấy toàn bộ overview lịch sử uống thuốc của bệnh nhân (cho người thân)
+router.get('/patients/:patientId/medication-history/overview', authMiddleware, relativePatientController.getPatientFullOverview);
+
+// Gói của bệnh nhân (cho người thân)
+router.get('/patients/:patientId/my-package', (req, res, next) => {
+	try {
+		// Log requester info early (before auth) so we see all hits
+		const maybeUser = req.user ? req.user._id : (req.headers && req.headers.authorization ? 'has-token' : 'no-token');
+		console.log(`[route] GET /relative-patient/patients/${req.params.patientId}/my-package called, requester=${maybeUser}`);
+	} catch (e) {
+		console.error('Logging middleware error for my-package route:', e && (e.stack || e.message || e));
+	}
+	next();
+}, authMiddleware, relativePatientController.getPatientActivePackage);
+router.get('/patients/:patientId/check-feature/:feature', authMiddleware, relativePatientController.checkPatientFeatureAccess);
+router.get('/patients/:patientId/my-history', authMiddleware, relativePatientController.getPatientPackageHistory);
+
 // Lấy chi tiết thuốc cụ thể của bệnh nhân
 router.get('/patients/:patientId/medications/:medicationId', authMiddleware, relativePatientController.getPatientMedicationById);
 
@@ -84,5 +115,12 @@ router.put('/patients/:patientId/medications/:medicationId', authMiddleware, rel
 
 // Xóa thuốc của bệnh nhân
 router.delete('/patients/:patientId/medications/:medicationId', authMiddleware, relativePatientController.deletePatientMedication);
+
+// Lưu nhiều thuốc từ OCR cho bệnh nhân bởi người thân
+// Lưu nhiều thuốc từ payload (JSON)
+router.post('/patients/:patientId/medications/from-ocr', authMiddleware, requireFeatureForUser('Phân tích đơn thuốc'), relativePatientController.createMedicationsFromOcrForPatient);
+
+// Upload ảnh, thực hiện OCR và lưu thuốc cho bệnh nhân (người thân)
+router.post('/patients/:patientId/medications/from-ocr-image', authMiddleware, requireFeatureForUser('Phân tích đơn thuốc'), upload.single('image'), relativePatientController.createMedicationsFromOcrImageForPatient);
 
 module.exports = router;

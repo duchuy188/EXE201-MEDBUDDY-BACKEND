@@ -39,6 +39,7 @@ var appointmentsRouter = require('./src/routes/appointments');
 var payosRouter = require('./src/routes/payos');
 var userPackageRouter = require('./src/routes/userPackage');
 var packageRouter = require('./src/routes/package');
+var ocrRouter = require('./src/routes/ocr');
 
 var app = express();
 
@@ -97,6 +98,7 @@ app.use('/api/appointments', appointmentsRouter);
 app.use('/api/payos', payosRouter);
 app.use('/api/user-package', userPackageRouter);
 app.use('/api/package', packageRouter);
+app.use('/ocr', ocrRouter); // Nếu như này thì endpoint là /ocr/ocr
 
 // Swagger UI route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

@@ -5,6 +5,8 @@ const authMiddleware = require("../middlewares/auth.middleware");
 const remindersController = require("../controllers/reminders.controller");
 const reminderStatusController = require("../controllers/reminderStatus.controller");
 const { isPaidUser } = require("../middlewares/ocr.middleware");
+const { requireFeature } = require('../middlewares/packageAccess.middleware');
+const voiceAccessMiddleware = requireFeature('Nhắc thuốc bằng giọng nói');
 
 // GET /reminders – Danh sách nhắc uống thuốc
 router.get("/", authMiddleware, remindersController.getReminders);
@@ -13,6 +15,13 @@ router.get("/", authMiddleware, remindersController.getReminders);
 router.post(
   "/",
   authMiddleware,
+  (req, res, next) => {
+    // Nếu là voice thì kiểm tra quyền, còn lại thì next luôn
+    if (req.body.reminderType === 'voice') {
+      return voiceAccessMiddleware(req, res, next);
+    }
+    next();
+  },
   isPaidUser,
   remindersController.createReminder
 );

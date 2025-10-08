@@ -11,6 +11,11 @@ const paymentSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // Who initiated the purchase (optional) - e.g., a relative buying for a patient
+  initiatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   packageId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Package',

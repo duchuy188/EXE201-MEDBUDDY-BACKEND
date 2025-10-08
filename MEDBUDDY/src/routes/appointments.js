@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth.middleware');
+const { requireFeature } = require('../middlewares/packageAccess.middleware');
+const appointmentAccessMiddleware = requireFeature('Đặt lịch khám');
 const {
     createAppointment,
     getAppointments,
@@ -12,12 +14,12 @@ const {
 router.use(auth);
 
 router.route('/')
-    .post(createAppointment)
+    .post(appointmentAccessMiddleware, createAppointment)
     .get(getAppointments);
 
 router.route('/:id')
     .get(getAppointmentById)
-    .put(updateAppointment)
+    .put(appointmentAccessMiddleware, updateAppointment)
     .delete(deleteAppointment);
 
 module.exports = router;

@@ -19,7 +19,7 @@ const ReminderSchema = new mongoose.Schema({
   voice: { 
     type: String, 
     enum: ['banmai', 'lannhi', 'leminh', 'myan', 'thuminh', 'giahuy', 'linhsan'],
-    default: 'banmai'
+    // No default here; controller will set voice only for voice reminders
   },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },

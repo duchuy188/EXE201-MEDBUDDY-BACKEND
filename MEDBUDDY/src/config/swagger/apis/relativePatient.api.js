@@ -30,6 +30,265 @@
 
 /**
  * @swagger
+ * /relative-patient/patients/{patientId}/purchase-package:
+ *   post:
+ *     tags: [RelativePatient]
+ *     summary: Người thân tạo link thanh toán để mua gói cho bệnh nhân
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               packageId:
+ *                 type: string
+ *                 example: "6510b2e2c8a1f2b1a1a1a1"
+ *     responses:
+ *       200:
+ *         description: Trả về link thanh toán và orderCode
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 paymentUrl:
+ *                   type: string
+ *                 orderCode:
+ *                   type: string
+ *       400:
+ *         description: Thiếu packageId
+ *       403:
+ *         description: Không có quyền thực hiện
+ *       404:
+ *         description: Package không tồn tại
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/medication-history/weekly:
+ *   get:
+ *     tags: [RelativePatient]
+ *     summary: Lấy tổng quan tuần uống thuốc của bệnh nhân (cho người thân)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *         description: Ngày bắt đầu (YYYY-MM-DD)
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *         description: Ngày kết thúc (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Tổng quan tuần
+ *       403:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/medication-history/overview:
+ *   get:
+ *     tags: [RelativePatient]
+ *     summary: Lấy toàn bộ overview lịch sử uống thuốc của bệnh nhân (cho người thân)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Overview đầy đủ
+ *       403:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/blood-pressures:
+ *   get:
+ *     tags: [RelativePatient]
+ *     summary: Lấy lịch sử huyết áp của bệnh nhân (cho người thân)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *     responses:
+ *       200:
+ *         description: Danh sách chỉ số huyết áp
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/BloodPressure'
+ *       403:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/blood-pressures/latest:
+ *   get:
+ *     tags: [RelativePatient]
+ *     summary: Lấy lần đo huyết áp mới nhất của bệnh nhân (cho người thân)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *     responses:
+ *       200:
+ *         description: Lần đo mới nhất
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/BloodPressure'
+ *       403:
+ *         description: Không có quyền truy cập
+ *       404:
+ *         description: Không có dữ liệu
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/medications/from-ocr:
+ *   post:
+ *     tags: [RelativePatient]
+ *     summary: Người thân lưu nhiều thuốc cho bệnh nhân từ kết quả OCR
+ *     description: Người thân với quyền phù hợp có thể gửi danh sách thuốc (được trích xuất từ OCR) để lưu vào hồ sơ bệnh nhân
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               medicines:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: "Paracetamol 500mg"
+ *                     usage:
+ *                       type: string
+ *                       example: "2 viên mỗi 8 giờ"
+ *                     quantity:
+ *                       type: string
+ *                       example: "30"
+ *                     times:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           time:
+ *                             type: string
+ *                           dosage:
+ *                             type: string
+ *               imageUrl:
+ *                 type: string
+ *                 description: URL ảnh gốc nếu có
+ *               rawText:
+ *                 type: string
+ *                 description: Văn bản thô trích xuất từ OCR
+ *     responses:
+ *       201:
+ *         description: Danh sách thuốc đã được lưu
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Medication'
+ *       400:
+ *         description: Dữ liệu đầu vào không hợp lệ
+ *       403:
+ *         description: Người thân không có quyền lưu thuốc cho bệnh nhân này
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
  * tags:
  *   name: RelativePatient
  *   description: Quản lý liên kết người thân-người bệnh

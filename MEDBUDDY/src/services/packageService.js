@@ -139,17 +139,13 @@ async function getActivePackage(userId) {
 }
 
 // Kiểm tra user có quyền sử dụng feature không
-async function hasFeatureAccess(userId, featureName) {
+async function hasFeatureAccess(userId, feature) {
   try {
     const activePackage = await getActivePackage(userId);
-    
-    
-    // Nếu không có gói active hoặc gói không có tính năng đó, từ chối truy cập
-    if (!activePackage || !activePackage.features.includes(featureName)) {
+    if (!activePackage || !activePackage.features) {
       return false;
     }
-
-    return true;
+    return activePackage.features.includes(feature);
   } catch (error) {
     console.error("Error checking feature access:", error);
     throw error;

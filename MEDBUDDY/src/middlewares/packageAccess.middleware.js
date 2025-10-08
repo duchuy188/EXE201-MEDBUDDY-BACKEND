@@ -2,6 +2,7 @@ const { hasFeatureAccess } = require("../services/packageService");
 const { body } = require("express-validator");
 const { validate } = require("../utils/validators");
 const { create } = require("../models/Package");
+const RelativePatient = require('../models/RelativePatient');
 
 // Middleware kiểm tra user có gói active không
 const requireActivePackage = async (req, res, next) => {
@@ -98,8 +99,10 @@ const requireFeature = (feature) => {
   return async (req, res, next) => {
     try {
       const userId = req.user._id;
+      console.log('Check feature:', feature, 'for user:', userId); // Debug
 
       const hasAccess = await hasFeatureAccess(userId, feature);
+      console.log('Feature access result:', hasAccess); // Debug
 
       if (!hasAccess) {
         return res.status(403).json({
@@ -116,6 +119,90 @@ const requireFeature = (feature) => {
         message: "Lỗi kiểm tra quyền sử dụng tính năng",
         error: error.message,
       });
+    }
+  };
+};
+
+// Helper to resolve target user id from request (params/body/query)
+const resolveTargetUserId = (req, field = 'patientId') => {
+  return req.params && req.params[field]
+    ? req.params[field]
+    : req.body && req.body[field]
+    ? req.body[field]
+    : req.query && req.query.userId
+    ? req.query.userId
+    : null;
+};
+
+// Check relationship: allow if requester is the patient themself or an accepted relative
+const ensureRelationOrSelf = async (reqUser, targetUserId) => {
+  // If requester is the patient themself
+  if (reqUser && reqUser.role === 'patient' && String(reqUser._id) === String(targetUserId)) {
+    return true;
+  }
+  // If requester is an accepted relative
+  if (reqUser && reqUser.role === 'relative') {
+    const rel = await RelativePatient.findOne({ patient: targetUserId, relative: reqUser._id, status: 'accepted' });
+    return !!rel;
+  }
+  // admins or others are not allowed by default here
+  return false;
+};
+
+// Middleware: require active package for a target user (e.g., patientId param). Useful when a relative calls patient-scoped route.
+const requireActivePackageForUser = (field = 'patientId') => {
+  return async (req, res, next) => {
+    try {
+      const targetUserId = resolveTargetUserId(req, field);
+      if (!targetUserId) return res.status(400).json({ message: 'Thiếu target user id (patientId)' });
+
+      // Check relation or self
+      const allowed = await ensureRelationOrSelf(req.user, targetUserId);
+      if (!allowed) return res.status(403).json({ message: 'Bạn không có quyền truy cập dữ liệu người này' });
+
+      const { getActivePackage } = require('../services/packageService');
+      const activePackage = await getActivePackage(targetUserId);
+
+      if (!activePackage) {
+        return res.status(403).json({
+          message: "Người dùng cần có gói dịch vụ active để sử dụng tính năng này",
+          hasActivePackage: false,
+          error: "NO_ACTIVE_PACKAGE",
+        });
+      }
+
+      req.activePackage = activePackage;
+      next();
+    } catch (error) {
+      res.status(500).json({ message: 'Lỗi kiểm tra gói dịch vụ cho người đích', error: error.message });
+    }
+  };
+};
+
+// Middleware: require feature access for a target user (patient)
+const requireFeatureForUser = (feature, field = 'patientId') => {
+  return async (req, res, next) => {
+    try {
+      const targetUserId = resolveTargetUserId(req, field);
+      if (!targetUserId) return res.status(400).json({ message: 'Thiếu target user id (patientId)' });
+
+      // Check relation or self
+      const allowed = await ensureRelationOrSelf(req.user, targetUserId);
+      if (!allowed) return res.status(403).json({ message: 'Bạn không có quyền truy cập dữ liệu người này' });
+
+      const hasAccess = await hasFeatureAccess(targetUserId, feature);
+      if (!hasAccess) {
+        return res.status(403).json({
+          message: `Người dùng mục tiêu không có quyền sử dụng tính năng: ${feature}`,
+          hasAccess: false,
+          requiredFeature: feature,
+          error: 'FEATURE_ACCESS_DENIED'
+        });
+      }
+
+      next();
+    } catch (error) {
+      res.status(500).json({ message: 'Lỗi kiểm tra quyền tính năng cho người đích', error: error.message });
     }
   };
 };
@@ -197,4 +284,6 @@ module.exports = {
   requirePremiumPackage,
   createPackageValidator,
   updatePackageValidator,
+  requireActivePackageForUser,
+  requireFeatureForUser
 };

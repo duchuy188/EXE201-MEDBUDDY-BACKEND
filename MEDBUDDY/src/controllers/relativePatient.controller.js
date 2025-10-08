@@ -5,6 +5,15 @@ const Package = require('../models/Package');
 const Reminder = require('../models/Reminder');
 const Appointment = require('../models/Appointment');
 const Medication = require('../models/Medication');
+const BloodPressure = require('../models/BloodPressure');
+const medicationHistoryController = require('./medicationHistory.controller');
+const { getActivePackage, hasFeatureAccess } = require('../services/packageService');
+const { now, formatVN, formatPackageExpiry } = require('../utils/dateHelper');
+const Payment = require('../models/Payment');
+const { sendPaymentConfirmationEmail, sendPaymentFailureEmail } = require('../services/paymentEmailService');
+const { activateUserPackage } = require('../services/packageService');
+const Tesseract = require('tesseract.js');
+const { uploadImage } = require('../services/uploadService');
 
 // API khởi tạo 3 gói dịch vụ đúng UI
 exports.createDefaultPackages = async (req, res) => {
@@ -234,9 +243,11 @@ exports.updatePackage = async (req, res) => {
 const checkRelativePermission = async (patientId, relativeId, userRole) => {
   // Kiểm tra người dùng phải là relative
   if (userRole !== 'relative') {
+    console.log(`checkRelativePermission: caller role=${userRole} is not 'relative'`);
     throw new Error('Chỉ người thân mới có quyền thực hiện hành động này');
   }
 
+  console.log(`checkRelativePermission: looking for relationship patient=${patientId} relative=${relativeId}`);
   const relationship = await RelativePatient.findOne({
     patient: patientId,
     relative: relativeId,
@@ -244,9 +255,11 @@ const checkRelativePermission = async (patientId, relativeId, userRole) => {
   });
 
   if (!relationship) {
+    console.log('checkRelativePermission: no accepted relationship found');
     throw new Error('Bạn không có quyền thực hiện hành động này cho bệnh nhân');
   }
 
+  console.log('checkRelativePermission: relationship found, permissions=', relationship.permissions);
   return relationship;
 };
 
@@ -291,12 +304,12 @@ exports.createMedicationReminderForPatient = async (req, res) => {
 
     console.log('Relationship permissions:', relationship.permissions);
 
-    // AUTO-FIX: Nếu permissions trống, tự động cập nhật
+    // Nếu permissions trống => từ chối (không tự động cấp quyền)
     if (!relationship.permissions || relationship.permissions.length === 0) {
-      console.log('🔧 Auto-fixing empty permissions...');
-      relationship.permissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
-      await relationship.save();
-      console.log('✅ Permissions auto-fixed:', relationship.permissions);
+      return res.status(403).json({
+        success: false,
+        message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền trước khi thực hiện hành động này.'
+      });
     }
 
     // Kiểm tra quyền schedule_medication
@@ -320,8 +333,22 @@ exports.createMedicationReminderForPatient = async (req, res) => {
 
     console.log('✅ All checks passed, creating reminder...');
 
+    // Nếu reminderType là 'voice' thì mới kiểm tra feature 'Nhắc thuốc bằng giọng nói'
+    if ((reminderType || 'normal') === 'voice') {
+      try {
+        const hasVoiceFeature = await hasFeatureAccess(patientId, 'Nhắc thuốc bằng giọng nói');
+        if (!hasVoiceFeature) {
+          return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói "Nhắc thuốc bằng giọng nói". Vui lòng mua gói để sử dụng tính năng này.' });
+        }
+      } catch (fErr) {
+        console.error('Error checking feature access for voice reminder:', fErr);
+        // nếu lỗi khi kiểm tra feature, chặn thao tác để an toàn
+        return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền tính năng của người bệnh' });
+      }
+    }
+
     // Tạo reminder mới
-    const reminder = new Reminder({
+    const reminderData = {
       userId: patientId,
       medicationId,
       reminderType: reminderType || 'normal',
@@ -330,11 +357,17 @@ exports.createMedicationReminderForPatient = async (req, res) => {
       endDate,
       repeatTimes,
       note: note || `Lịch uống thuốc được tạo bởi người thân: ${req.user.fullName}`,
-      voice: voice || 'banmai',
       isActive: true,
       createdBy: req.user._id,
       createdByType: 'relative'
-    });
+    };
+
+    // Only set voice when reminderType is 'voice'
+    if ((reminderType || 'normal') === 'voice') {
+      reminderData.voice = voice || 'banmai';
+    }
+
+    const reminder = new Reminder(reminderData);
 
     await reminder.save();
 
@@ -388,6 +421,17 @@ exports.createAppointmentForPatient = async (req, res) => {
       });
     }
 
+    // Kiểm tra feature của bệnh nhân: Hẹn tái khám
+    try {
+      const hasAppointmentFeature = await hasFeatureAccess(patientId, 'Hẹn tái khám');
+      if (!hasAppointmentFeature) {
+        return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói dịch vụ. Vui lòng mua gói để sử dụng tính năng này.' });
+      }
+    } catch (fErr) {
+      console.error('Error checking appointment feature access:', fErr);
+      return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền tính năng của người bệnh' });
+    }
+
     // Tạo appointment mới
     const appointment = new Appointment({
       title,
@@ -411,6 +455,147 @@ exports.createAppointmentForPatient = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Người thân tạo link thanh toán để mua gói cho bệnh nhân
+exports.createPaymentLinkForPatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    if (req.user.role !== 'relative') {
+      return res.status(403).json({ message: 'Chỉ người thân mới có thể thực hiện thao tác này' });
+    }
+
+    // Kiểm tra mối quan hệ
+    const relationship = await RelativePatient.findOne({ patient: patientId, relative: relativeId, status: 'accepted' });
+    if (!relationship) {
+      return res.status(403).json({ message: 'Bạn không có quyền thực hiện hành động này cho bệnh nhân' });
+    }
+
+    const { packageId } = req.body;
+    if (!packageId) return res.status(400).json({ message: 'Thiếu packageId' });
+
+    const packageInfo = await Package.findById(packageId);
+    if (!packageInfo) return res.status(404).json({ message: 'Package không tồn tại' });
+
+    const scheme = 'medbuddy://';
+    const orderCode = Date.now();
+    const returnUrl = `${scheme}payment-success?orderCode=${orderCode}`;
+    const cancelUrl = `${scheme}payment-cancel?orderCode=${orderCode}`;
+    const order = {
+      amount: packageInfo.price,
+      description: packageInfo.name.length > 25 ? packageInfo.name.substring(0, 25) : packageInfo.name,
+      orderCode,
+      returnUrl,
+      cancelUrl,
+      items: [{
+        name: packageInfo.name.length > 25 ? packageInfo.name.substring(0, 25) : packageInfo.name,
+        quantity: 1,
+        price: packageInfo.price
+      }]
+    };
+
+    // require payOS lazily to avoid top-level require which needs env vars
+    const payOS = require('../config/payos/payos.config');
+    const paymentLinkResponse = await payOS.paymentRequests.create(order);
+
+    const payment = new Payment({
+      orderCode: paymentLinkResponse.orderCode,
+      userId: patientId, // purchase is for patient
+      packageId: packageId,
+      amount: packageInfo.price,
+      description: order.description,
+      paymentUrl: paymentLinkResponse.checkoutUrl,
+      status: 'PENDING'
+    });
+    // store who initiated the purchase (relative)
+    payment.initiatedBy = relativeId;
+    await payment.save();
+
+    res.json({
+      message: 'Tạo link thanh toán cho bệnh nhân thành công',
+      paymentUrl: paymentLinkResponse.checkoutUrl,
+      orderCode: paymentLinkResponse.orderCode
+    });
+  } catch (err) {
+    console.error('Error in createPaymentLinkForPatient:', err);
+    res.status(500).json({ message: 'Lỗi tạo link thanh toán', error: err.message });
+  }
+};
+
+// Lấy gói active của bệnh nhân (cho người thân)
+exports.getPatientActivePackage = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    // Kiểm tra quan hệ và quyền
+    await checkRelativePermission(patientId, req.user._id, req.user.role);
+
+    const activePackage = await getActivePackage(patientId);
+    if (!activePackage) {
+      return res.json({ message: 'Người bệnh chưa có gói dịch vụ', hasActivePackage: false, data: null });
+    }
+
+    res.json({
+      message: 'Gói dịch vụ active của người bệnh',
+      hasActivePackage: true,
+      data: {
+        package: activePackage.packageId,
+        startDate: activePackage.startDate,
+        endDate: activePackage.endDate,
+        features: activePackage.features,
+        isActive: activePackage.isActive,
+        daysRemaining: Math.ceil((activePackage.endDate - now().toDate()) / (1000 * 60 * 60 * 24)),
+        formattedStartDate: formatVN(activePackage.startDate),
+        formattedEndDate: formatPackageExpiry(activePackage.endDate)
+      }
+    });
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+};
+
+// Kiểm tra quyền sử dụng feature của bệnh nhân (cho người thân)
+exports.checkPatientFeatureAccess = async (req, res) => {
+  try {
+    const { patientId, feature } = req.params;
+    await checkRelativePermission(patientId, req.user._id, req.user.role);
+
+    const hasAccess = await hasFeatureAccess(patientId, feature);
+    res.json({ message: hasAccess ? 'Người bệnh có quyền sử dụng' : 'Người bệnh không có quyền sử dụng', hasAccess, feature });
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+};
+
+// Lấy lịch sử gói của bệnh nhân (cho người thân)
+exports.getPatientPackageHistory = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    console.log(`getPatientPackageHistory: called with patientId=${patientId} by user=${req.user ? req.user._id : 'anonymous'} role=${req.user ? req.user.role : 'unknown'}`);
+    await checkRelativePermission(patientId, req.user._id, req.user.role);
+
+    const payments = await Payment.find({ userId: patientId, status: 'PAID' })
+      .populate('packageId', 'name price duration unit features')
+      .sort({ paidAt: -1 });
+
+    res.json({
+      message: 'Lịch sử gói của người bệnh',
+      data: payments.map(payment => ({
+        orderCode: payment.orderCode,
+        package: payment.packageId,
+        amount: payment.amount,
+        paidAt: payment.paidAt,
+        formattedPaidAt: formatVN(payment.paidAt),
+        status: payment.status
+      }))
+    });
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
 };
 
@@ -497,8 +682,35 @@ exports.updatePatientMedicationReminder = async (req, res) => {
       });
     }
 
-    // Cập nhật reminder
-    Object.assign(reminder, updateData);
+    // Prevent changing to voice reminder unless patient has the voice feature
+    const newType = (updateData.reminderType || reminder.reminderType || 'normal');
+    if (newType === 'voice') {
+      try {
+        const hasVoiceFeature = await hasFeatureAccess(patientId, 'Nhắc thuốc bằng giọng nói');
+        if (!hasVoiceFeature) {
+          return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói "Nhắc thuốc bằng giọng nói". Vui lòng mua gói để sử dụng tính năng này.' });
+        }
+      } catch (fErr) {
+        console.error('Error checking feature access for voice reminder update:', fErr);
+        return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền tính năng của người bệnh' });
+      }
+    }
+
+    // Only set voice when resulting reminder type is 'voice'
+    if (newType === 'voice') {
+      if (updateData.voice) reminder.voice = updateData.voice;
+    } else {
+      // if switching away from voice, remove voice field to avoid accidental preservation
+      reminder.voice = undefined;
+    }
+
+    // Apply other updates (except voice and reminderType handled separately)
+    const safeUpdates = { ...updateData };
+    delete safeUpdates.voice;
+    delete safeUpdates.reminderType;
+    Object.assign(reminder, safeUpdates);
+    // set reminderType explicitly
+    reminder.reminderType = newType;
     await reminder.save();
 
     res.json({
@@ -513,6 +725,7 @@ exports.updatePatientMedicationReminder = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // API cập nhật lịch tái khám của bệnh nhân (bởi người thân)
 exports.updatePatientAppointment = async (req, res) => {
@@ -530,6 +743,17 @@ exports.updatePatientAppointment = async (req, res) => {
         success: false,
         message: 'Bạn không có quyền cập nhật lịch tái khám'
       });
+    }
+
+    // Kiểm tra feature OCR của bệnh nhân
+    try {
+      const hasOcrFeature = await hasFeatureAccess(patientId, 'Phân tích đơn thuốc');
+      if (!hasOcrFeature) {
+        return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói dịch vụ. Vui lòng mua gói để sử dụng tính năng này.' });
+      }
+    } catch (fErr) {
+      console.error('Error checking OCR feature access:', fErr);
+      return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền tính năng của người bệnh' });
     }
 
     const appointment = await Appointment.findOne({
@@ -578,6 +802,13 @@ exports.deletePatientMedicationReminder = async (req, res) => {
       });
     }
 
+    // Nếu reminder là voice, kiểm tra feature của bệnh nhân
+    if (reminder.reminderType === 'voice') {
+      const hasVoiceFeature = await hasFeatureAccess(patientId, 'Nhắc thuốc bằng giọng nói');
+      if (!hasVoiceFeature) {
+        return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói dịch vụ "Nhắc thuốc bằng giọng nói". Không thể xóa.' });
+      }
+    }
     const reminder = await Reminder.findOne({
       _id: reminderId,
       userId: patientId
@@ -859,6 +1090,77 @@ exports.getPatientMedications = async (req, res) => {
   }
 };
 
+// Lấy lịch sử huyết áp của bệnh nhân cho người thân
+exports.getPatientBloodPressures = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Kiểm tra quyền
+    await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    const list = await BloodPressure.find({ userId: patientId }).sort({ measuredAt: -1 });
+    res.json({ success: true, data: list });
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Lấy lần đo huyết áp mới nhất của bệnh nhân cho người thân
+exports.getPatientLatestBloodPressure = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Kiểm tra quyền
+    await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    const latest = await BloodPressure.findOne({ userId: patientId }).sort({ measuredAt: -1 });
+    if (!latest) return res.status(404).json({ success: false, message: 'Không có dữ liệu' });
+    res.json({ success: true, data: latest });
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Wrapper: Lấy tổng quan tuần uống thuốc (cho người thân)
+exports.getPatientWeeklyOverview = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Kiểm tra quyền
+    await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    // Delegate tới medicationHistory controller, reusing logic
+    // Build a fake req/res to pass userId param through
+    const fakeReq = { params: { userId: patientId }, query: req.query };
+    return medicationHistoryController.getWeeklyOverview(fakeReq, res);
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Wrapper: Lấy tổng quan đầy đủ lịch sử uống thuốc (cho người thân)
+exports.getPatientFullOverview = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Kiểm tra quyền
+    await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    const fakeReq = { params: { userId: patientId }, query: req.query };
+    return medicationHistoryController.getFullOverview(fakeReq, res);
+  } catch (error) {
+    if (error.message && error.message.includes('quyền')) return res.status(403).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Thêm thuốc mới cho bệnh nhân (bởi người thân)
 exports.createMedicationForPatient = async (req, res) => {
   try {
@@ -869,10 +1171,9 @@ exports.createMedicationForPatient = async (req, res) => {
     // Kiểm tra quyền
     const relationship = await checkRelativePermission(patientId, relativeId, req.user.role);
 
-    // AUTO-FIX: Nếu permissions trống, tự động cập nhật
+    // Nếu permissions trống => từ chối
     if (!relationship.permissions || relationship.permissions.length === 0) {
-      relationship.permissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
-      await relationship.save();
+      return res.status(403).json({ success: false, message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền.' });
     }
 
     // Kiểm tra quyền manage_health_data hoặc schedule_medication
@@ -922,10 +1223,9 @@ exports.updatePatientMedication = async (req, res) => {
     // Kiểm tra quyền
     const relationship = await checkRelativePermission(patientId, relativeId, req.user.role);
 
-    // AUTO-FIX permissions
+    // Nếu permissions trống => từ chối
     if (!relationship.permissions || relationship.permissions.length === 0) {
-      relationship.permissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
-      await relationship.save();
+      return res.status(403).json({ success: false, message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền.' });
     }
 
     // Kiểm tra quyền manage_health_data hoặc schedule_medication
@@ -975,10 +1275,9 @@ exports.deletePatientMedication = async (req, res) => {
     // Kiểm tra quyền
     const relationship = await checkRelativePermission(patientId, relativeId, req.user.role);
 
-    // AUTO-FIX permissions
+    // Nếu permissions trống => từ chối
     if (!relationship.permissions || relationship.permissions.length === 0) {
-      relationship.permissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
-      await relationship.save();
+      return res.status(403).json({ success: false, message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền.' });
     }
 
     // Kiểm tra quyền manage_health_data hoặc schedule_medication
@@ -1044,5 +1343,156 @@ exports.getPatientMedicationById = async (req, res) => {
       return res.status(403).json({ success: false, message: error.message });
     }
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Lưu nhiều thuốc từ kết quả OCR cho bệnh nhân bởi người thân (nếu có quyền)
+exports.createMedicationsFromOcrForPatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Kiểm tra quan hệ và quyền
+    const relationship = await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    // Nếu permissions trống => từ chối
+    if (!relationship.permissions || relationship.permissions.length === 0) {
+      return res.status(403).json({ success: false, message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền.' });
+    }
+
+    if (!relationship.permissions.includes('manage_health_data') && !relationship.permissions.includes('schedule_medication')) {
+      return res.status(403).json({ success: false, message: 'Ba1n kh f4ng c f3 quy ean th eam thu f3c cho bc7nh nh e2n' });
+    }
+
+    const { medicines, imageUrl, rawText } = req.body;
+    if (!Array.isArray(medicines) || medicines.length === 0) {
+      return res.status(400).json({ message: 'Danh s e1ch thu f3c kh f4ng h f9p l ed' });
+    }
+
+    // Map từng thuốc sang schema Medication
+    const docs = medicines.map(med => ({
+      userId: patientId,
+      name: med.name,
+      form: med.form || '',
+      image: med.image || imageUrl || '',
+      note: med.usage || med.note || rawText || '',
+      quantity: med.quantity || '',
+      times: med.times || [],
+      createdBy: relativeId,
+      createdByType: 'relative'
+    }));
+
+    // Debug logging to help diagnose why inserts might not persist
+    console.log('createMedicationsFromOcrForPatient: inserting docs count=', docs.length);
+    if (docs.length > 0) console.log('example doc:', JSON.stringify(docs[0]).slice(0, 1000));
+
+    try {
+      const result = await Medication.insertMany(docs, { ordered: false });
+      console.log('createMedicationsFromOcrForPatient: insertMany result count=', Array.isArray(result) ? result.length : 0);
+      return res.status(201).json({ success: true, data: result });
+    } catch (insertErr) {
+      console.error('createMedicationsFromOcrForPatient: insertMany error:', insertErr && (insertErr.stack || insertErr.message || insertErr));
+      // If validation errors, return details to client for debugging
+      if (insertErr && insertErr.writeErrors) {
+        const messages = insertErr.writeErrors.map(e => e.err && e.err.message ? e.err.message : (e.toString()));
+        return res.status(400).json({ message: 'Lỗi khi lưu một số thuốc', details: messages, error: insertErr.message });
+      }
+      return res.status(500).json({ message: 'Lỗi khi lưu thuốc', error: insertErr.message || insertErr });
+    }
+  } catch (err) {
+    console.error('Error in createMedicationsFromOcrForPatient:', err);
+    res.status(400).json({ message: 'Không thể lưu danh sách thuốc', error: err.message });
+  }
+};
+
+// Upload image, use central /ocr handler to parse, then save medications for patient (by relative)
+exports.createMedicationsFromOcrImageForPatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Only require that the patient has the OCR feature enabled
+    try {
+      const hasOcrFeature = await hasFeatureAccess(patientId, 'Phân tích đơn thuốc');
+      if (!hasOcrFeature) {
+        return res.status(403).json({ success: false, message: 'Người bệnh chưa có feature Phân tích đơn thuốc. Vui lòng mua gói.' });
+      }
+    } catch (fErr) {
+      console.error('Error checking OCR feature access for patient:', fErr);
+      return res.status(500).json({ success: false, message: 'Lỗi kiểm tra quyền tính năng của người bệnh' });
+    }
+
+    if (!req.file) return res.status(400).json({ message: 'Thiếu file ảnh (field: image)' });
+
+    // Delegate OCR + parsing to the central OCR controller to avoid duplicating logic
+    const ocrController = require('./ocr.controller');
+
+    // Create a fake response to capture what ocrController.ocrPrescription would send
+    const captured = await new Promise((resolve) => {
+      const fakeRes = {
+        statusCode: 200,
+        headers: {},
+        status(code) {
+          this.statusCode = code;
+          return this;
+        },
+        json(payload) {
+          resolve({ status: this.statusCode || 200, body: payload });
+          return this;
+        },
+        send(payload) {
+          resolve({ status: this.statusCode || 200, body: payload });
+          return this;
+        },
+        end() {
+          resolve({ status: this.statusCode || 200, body: null });
+        }
+      };
+
+      // Call the central OCR handler with the same req (it expects req.file) and our fakeRes
+      try {
+        ocrController.ocrPrescription(req, fakeRes);
+      } catch (callErr) {
+        console.error('Error calling central OCR handler:', callErr);
+        resolve({ status: 500, body: { message: 'Lỗi khi gọi OCR trung tâm', error: callErr && callErr.message } });
+      }
+    });
+
+    if (!captured || !captured.body) {
+      return res.status(500).json({ message: 'OCR không trả về dữ liệu' });
+    }
+
+    // If central OCR returned an error status, forward it
+    if (captured.status && captured.status >= 400) {
+      return res.status(captured.status).json(captured.body);
+    }
+
+    const ocrResult = captured.body;
+    const medicines = Array.isArray(ocrResult.medicines) ? ocrResult.medicines : [];
+    const imageUrl = ocrResult.imageUrl || '';
+    const rawText = ocrResult.rawText || '';
+
+    if (!medicines || medicines.length === 0) {
+      return res.status(400).json({ message: 'Không nhận diện được thuốc từ ảnh', rawText, imageUrl });
+    }
+
+    // Map and save medicines using existing Medication schema
+    const docs = medicines.map(med => ({
+      userId: patientId,
+      name: med.name,
+      form: med.form || '',
+      image: med.image || imageUrl || '',
+      note: med.usage || med.note || rawText || '',
+      quantity: med.quantity || '',
+      times: med.times || [],
+      createdBy: relativeId,
+      createdByType: 'relative'
+    }));
+
+    const result = await require('../models/Medication').insertMany(docs);
+    res.status(201).json({ success: true, data: result, rawText, imageUrl });
+  } catch (err) {
+    console.error('Error in createMedicationsFromOcrImageForPatient:', err);
+    res.status(500).json({ message: 'Lỗi OCR và lưu thuốc', error: err.message });
   }
 };

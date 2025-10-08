@@ -48,8 +48,13 @@ router.use('/alerts', alertsRouter);
 // Medication history routes
 router.use('/medication-history', medicationHistoryRouter);
 
-// Relative-Patient routes
-router.use('/relative-patient', relativePatientRouter);
+// Relative-Patient routes (disable caching for these API endpoints)
+router.use('/relative-patient', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+}, relativePatientRouter);
 
 // OCR routes
 router.use('/ocr', ocrRouter);

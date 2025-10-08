@@ -192,12 +192,37 @@ exports.ocrPrescription = async (req, res) => {
         
         return true;
       })
-      .map(m => ({
-        name: m.name.trim(),
-        quantity: m.quantity.trim(),
-        usage: m.usage.trim(),
-        note: typeof m.note === 'string' ? m.note.trim() : ''
-      }));;
+      .map(m => {
+        // Tách form từ quantity nếu có
+        let form = '';
+        const formMatch = m.quantity.match(/viên|ống|vỉ|gói|chai|ml|mg|mcg|lọ|tuýp|ông/i);
+        if (formMatch) form = formMatch[0];
+
+        // Tách times và dosage từ usage nếu có
+        let times = [];
+        const timePattern = /(Sáng|Chiều|Tối)/gi;
+        const dosagePattern = /(\d+(\.\d+)?\s*(viên|ml|mg|mcg)?)/gi;
+        if (m.usage) {
+          const timeMatches = m.usage.match(timePattern);
+          const dosageMatches = m.usage.match(dosagePattern);
+          if (timeMatches && dosageMatches) {
+            for (let i = 0; i < timeMatches.length; i++) {
+              times.push({
+                time: timeMatches[i],
+                dosage: dosageMatches[i] || ''
+              });
+            }
+          }
+        }
+
+        return {
+          name: m.name.trim(),
+          form,
+          note: m.note ? m.note.trim() : '',
+          quantity: m.quantity.trim(),
+          times,
+        };
+      });
     
     console.log('Extracted medicines:', result); // Debug log
     
