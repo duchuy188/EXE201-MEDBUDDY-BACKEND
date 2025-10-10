@@ -93,5 +93,12 @@ function onListening() {
     // Start package management jobs
     const { startPackageJobs } = require('../src/jobs/packageExpiryJob');
     startPackageJobs();
+    // Start periodic API caller job (every 10 minutes)
+    try {
+      const { startCallApiJob } = require('../src/jobs/callApiJob');
+      startCallApiJob();
+    } catch (err) {
+      console.error('[BOOT] Không thể khởi động callApiJob:', err.message);
+    }
   }
 }
