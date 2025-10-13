@@ -1,4 +1,5 @@
-const { hasFeatureAccess } = require("../services/packageService");
+const { hasFeatureAccess, getActivePackage } = require("../services/packageService");
+const Payment = require('../models/Payment');
 const { body } = require("express-validator");
 const { validate } = require("../utils/validators");
 const { create } = require("../models/Package");
@@ -101,10 +102,31 @@ const requireFeature = (feature) => {
       const userId = req.user._id;
       console.log('Check feature:', feature, 'for user:', userId); // Debug
 
-      const hasAccess = await hasFeatureAccess(userId, feature);
+      let hasAccess = await hasFeatureAccess(userId, feature);
       console.log('Feature access result:', hasAccess); // Debug
 
+      // Fallback: if the feature check fails, allow access when user has an active package
+      // or has at least one Payment record (treat as paid user). This matches the expectation
+      // "user bought the package => can use feature".
       if (!hasAccess) {
+        try {
+          const activePackage = await getActivePackage(userId);
+          if (activePackage) {
+            console.log('Feature allowed because user has an active package:', userId);
+            return next();
+          }
+
+          // Also allow if user has any payment records (legacy payment check)
+          const payment = await Payment.findOne({ userId });
+          if (payment) {
+            console.log('Feature allowed because user has a Payment record:', userId);
+            return next();
+          }
+        } catch (err) {
+          console.error('Fallback checks for feature access failed:', err);
+          // fall through to deny below if fallback fails
+        }
+
         return res.status(403).json({
           message: `Bạn không có quyền sử dụng tính năng: ${feature}`,
           hasAccess: false,
@@ -191,16 +213,33 @@ const requireFeatureForUser = (feature, field = 'patientId') => {
       if (!allowed) return res.status(403).json({ message: 'Bạn không có quyền truy cập dữ liệu người này' });
 
       const hasAccess = await hasFeatureAccess(targetUserId, feature);
-      if (!hasAccess) {
-        return res.status(403).json({
-          message: `Người dùng mục tiêu không có quyền sử dụng tính năng: ${feature}`,
-          hasAccess: false,
-          requiredFeature: feature,
-          error: 'FEATURE_ACCESS_DENIED'
-        });
-      }
+          if (!hasAccess) {
+            // Fallback: allow if the target user has an active package or any Payment record
+            try {
+              const activePackage = await getActivePackage(targetUserId);
+              if (activePackage) {
+                console.log('Feature allowed for target because user has an active package:', targetUserId);
+                return next();
+              }
 
-      next();
+              const payment = await Payment.findOne({ userId: targetUserId });
+              if (payment) {
+                console.log('Feature allowed for target because user has a Payment record:', targetUserId);
+                return next();
+              }
+            } catch (err) {
+              console.error('Fallback checks for target feature access failed:', err);
+            }
+
+            return res.status(403).json({
+              message: `Người dùng mục tiêu không có quyền sử dụng tính năng: ${feature}`,
+              hasAccess: false,
+              requiredFeature: feature,
+              error: 'FEATURE_ACCESS_DENIED'
+            });
+          }
+
+          next();
     } catch (error) {
       res.status(500).json({ message: 'Lỗi kiểm tra quyền tính năng cho người đích', error: error.message });
     }
