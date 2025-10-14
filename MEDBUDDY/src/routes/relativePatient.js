@@ -107,6 +107,16 @@ router.get('/patients/:patientId/my-package', (req, res, next) => {
 router.get('/patients/:patientId/check-feature/:feature', authMiddleware, relativePatientController.checkPatientFeatureAccess);
 router.get('/patients/:patientId/my-history', authMiddleware, relativePatientController.getPatientPackageHistory);
 
+// Lưa nhiều thuốc từ OCR cho bệnh nhân bởi người thân
+// Lưu nhiều thuốc từ payload (JSON)
+router.post('/patients/:patientId/medications/from-ocr', authMiddleware, requireFeatureForUser('Phân tích đơn thuốc'), relativePatientController.createMedicationsFromOcrForPatient);
+
+// Upload ảnh, thực hiện OCR và lưu thuốc cho bệnh nhân (người thân)
+router.post('/patients/:patientId/medications/from-ocr-image', authMiddleware, requireFeatureForUser('Phân tích đơn thuốc'), upload.single('image'), relativePatientController.createMedicationsFromOcrImageForPatient);
+
+// Lấy danh sách thuốc sắp hết của bệnh nhân (bởi người thân) - PHẢI ĐẶT TRƯỚC :medicationId
+router.get('/patients/:patientId/medications/low-stock', authMiddleware, relativePatientController.getPatientLowStockMedications);
+
 // Lấy chi tiết thuốc cụ thể của bệnh nhân
 router.get('/patients/:patientId/medications/:medicationId', authMiddleware, relativePatientController.getPatientMedicationById);
 
@@ -115,12 +125,5 @@ router.put('/patients/:patientId/medications/:medicationId', authMiddleware, rel
 
 // Xóa thuốc của bệnh nhân
 router.delete('/patients/:patientId/medications/:medicationId', authMiddleware, relativePatientController.deletePatientMedication);
-
-// Lưu nhiều thuốc từ OCR cho bệnh nhân bởi người thân
-// Lưu nhiều thuốc từ payload (JSON)
-router.post('/patients/:patientId/medications/from-ocr', authMiddleware, requireFeatureForUser('Phân tích đơn thuốc'), relativePatientController.createMedicationsFromOcrForPatient);
-
-// Upload ảnh, thực hiện OCR và lưu thuốc cho bệnh nhân (người thân)
-router.post('/patients/:patientId/medications/from-ocr-image', authMiddleware, requireFeatureForUser('Phân tích đơn thuốc'), upload.single('image'), relativePatientController.createMedicationsFromOcrImageForPatient);
 
 module.exports = router;

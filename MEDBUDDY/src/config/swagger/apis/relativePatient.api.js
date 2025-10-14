@@ -809,15 +809,9 @@
  *               form:
  *                 type: string
  *                 description: Dạng thuốc (viên, lọ, ...)
- *               image:
- *                 type: string
- *                 description: URL hình ảnh thuốc
  *               note:
  *                 type: string
  *                 description: Ghi chú
- *               quantity:
- *                 type: string
- *                 description: Tổng số lượng thuốc
  *               times:
  *                 type: array
  *                 items:
@@ -950,6 +944,105 @@
  *         description: Không có quyền thực hiện
  *       404:
  *         description: Không tìm thấy thuốc
+ *       500:
+ *         description: Lỗi server
+ */
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/medications/{medicationId}/add-stock:
+ *   post:
+ *     summary: Thêm thuốc mới cho bệnh nhân (bởi người thân)
+ *     tags: [RelativePatient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *       - in: path
+ *         name: medicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của thuốc
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               addedQuantity:
+ *                 type: number
+ *                 description: Số lượng thuốc thêm vào
+ *                 example: 20
+ *     responses:
+ *       200:
+ *         description: Thêm thuốc thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                     remainingQuantity:
+ *                       type: number
+ *                     totalQuantity:
+ *                       type: number
+ *       400:
+ *         description: Số lượng thêm phải lớn hơn 0
+ *       403:
+ *         description: Không có quyền thực hiện
+ *       404:
+ *         description: Không tìm thấy thuốc
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
+ * /relative-patient/patients/{patientId}/medications/low-stock:
+ *   get:
+ *     summary: Lấy danh sách thuốc sắp hết của bệnh nhân (bởi người thân)
+ *     tags: [RelativePatient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách thuốc sắp hết thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Medication'
+ *       403:
+ *         description: Không có quyền thực hiện
  *       500:
  *         description: Lỗi server
  */

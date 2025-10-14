@@ -93,5 +93,7 @@ function onListening() {
     // Start package management jobs
     const { startPackageJobs } = require('../src/jobs/packageExpiryJob');
     startPackageJobs();
+    
+    // Medication stock jobs auto-start when imported in app.js
   }
 }

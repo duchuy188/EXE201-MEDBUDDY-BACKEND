@@ -25,6 +25,29 @@
  *         note:
  *           type: string
  *           description: Ghi chú
+ *         quantity:
+ *           type: string
+ *           description: Tổng số lượng thuốc (giữ nguyên để tương thích)
+ *         totalQuantity:
+ *           type: number
+ *           description: Tổng số lượng ban đầu
+ *           example: 30
+ *         remainingQuantity:
+ *           type: number
+ *           description: Số lượng còn lại
+ *           example: 25
+ *         lowStockThreshold:
+ *           type: number
+ *           description: Ngưỡng cảnh báo (mặc định 5 viên)
+ *           example: 5
+ *         isLowStock:
+ *           type: boolean
+ *           description: Đã cảnh báo chưa
+ *           example: false
+ *         lastRefillDate:
+ *           type: string
+ *           format: date-time
+ *           description: Ngày mua thêm gần nhất
 *         times:
 *           type: array
 *           description: Mảng các buổi uống và liều lượng
@@ -48,13 +71,17 @@
 *       example:
 *         name: "Amlodipine 5mg"
 *         form: "viên nén"
-*         image: "https://example.com/amlodipine.jpg"
 *         note: "Uống vào buổi sáng sau ăn"
+*         totalQuantity: 30
+*         remainingQuantity: 25
+*         lowStockThreshold: 5
+*         isLowStock: false
+*         lastRefillDate: "2024-01-15T00:00:00.000Z"
 *         userId: "64d1f2c2e1b2a3c4d5e6f7a8"
 *         times:
-*           - timeOfDay: "Sáng"
+*           - time: "Sáng"
 *             dosage: "1 viên"
-*           - timeOfDay: "Tối"
+*           - time: "Tối"
 *             dosage: "1 viên"
-*         expirationDate: "2025-12-31"
+*         createdAt: "2024-01-01T00:00:00.000Z"
  */

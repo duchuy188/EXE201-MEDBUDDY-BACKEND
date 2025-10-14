@@ -1,5 +1,6 @@
 const Reminder = require('../models/Reminder');
 const MedicationHistory = require('../models/MedicationHistory');
+const MedicationQuantityService = require('../services/medicationQuantity.service');
 
 // Helper function để cộng phút vào thời gian HH:mm
 function addMinutes(timeStr, minutes) {
@@ -163,6 +164,20 @@ exports.updateReminderStatus = async (req, res) => {
       history.takenAt = new Date();
       
       console.log(`[STATUS] Scheduled: ${scheduledTime}, Current: ${currentTime}, Status: ${history.status}`);
+      
+      // Cập nhật số lượng thuốc sau khi uống
+      if (reminder.medicationId) {
+        try {
+          await MedicationQuantityService.updateQuantityAfterTaking(
+            reminder.medicationId, 
+            reminder.note || '1 viên'
+          );
+          console.log(`[QUANTITY] Đã cập nhật số lượng thuốc cho medicationId: ${reminder.medicationId}`);
+        } catch (quantityError) {
+          console.error('Lỗi cập nhật số lượng:', quantityError);
+          // Không throw error để không ảnh hưởng đến việc cập nhật trạng thái
+        }
+      }
       
     } else if (action === 'skip') {
       history.status = 'skipped';
