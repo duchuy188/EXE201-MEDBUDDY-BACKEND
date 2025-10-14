@@ -6,12 +6,23 @@ const BloodPressureReminderSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  times: [{
-    time: {
-      type: String, // kiểu giờ, ví dụ "07:00"
-      required: true
-    }
-  }],
+  times: {
+    type: [{
+      label: {
+        type: String, // ví dụ: "Sáng", "Chiều"
+        enum: ['Sáng', 'Trưa', 'Chiều', 'Tối'],
+        default: 'Sáng'
+      },
+      time: {
+        type: String, // kiểu giờ, ví dụ "07:00"
+        required: true
+      }
+    }],
+    default: [
+      { label: 'Sáng', time: '07:00' },
+      { label: 'Chiều', time: '15:00' }
+    ]
+  },
   note: {
     type: String,
     default: 'Đã đến giờ đo huyết áp!'
