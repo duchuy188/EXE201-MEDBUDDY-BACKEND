@@ -200,6 +200,9 @@ exports.getFullOverview = async (req, res) => {
       .limit(parseInt(limit))
       .skip(parseInt(offset));
 
+    // Filter out histories có medicationId null (thuốc đã bị xóa)
+    const validHistories = histories.filter(history => history.medicationId !== null);
+
     // Đếm tổng
     const total = await MedicationHistory.countDocuments({ userId });
 
@@ -221,7 +224,7 @@ exports.getFullOverview = async (req, res) => {
 
     // Group theo medication
     const medicationGroups = {};
-    histories.forEach(history => {
+    validHistories.forEach(history => {
       const medId = history.medicationId._id.toString();
       if (!medicationGroups[medId]) {
         medicationGroups[medId] = {
@@ -245,7 +248,7 @@ exports.getFullOverview = async (req, res) => {
     });
 
     res.json({
-      data: histories,
+      data: validHistories,
       pagination: {
         total,
         limit: parseInt(limit),

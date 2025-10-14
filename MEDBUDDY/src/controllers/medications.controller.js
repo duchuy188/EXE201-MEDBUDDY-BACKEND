@@ -24,6 +24,9 @@ exports.createMedicationsFromOcr = async (req, res) => {
   }
 };
 const Medication = require('../models/Medication');
+const Reminder = require('../models/Reminder');
+const MedicationHistory = require('../models/MedicationHistory');
+const MedicationQuantityService = require('../services/medicationQuantity.service');
 
 // Lấy danh sách thuốc của người dùng
 exports.getMedications = async (req, res) => {
@@ -40,8 +43,27 @@ exports.getMedications = async (req, res) => {
 exports.createMedication = async (req, res) => {
   try {
     const userId = req.user?._id || req.body.userId;
-  const { name, form, image, note, times, quantity } = req.body;
-  const medication = new Medication({ userId, name, form, image, note, times, quantity });
+    const { name, form, image, note, times, quantity, totalQuantity, lowStockThreshold } = req.body;
+    
+    // Parse quantity nếu là string
+    const parsedTotalQuantity = totalQuantity || parseInt(quantity) || 0;
+    
+    // Tự động tạo quantity string từ totalQuantity
+    const quantityString = parsedTotalQuantity ? `${parsedTotalQuantity} viên` : (quantity || '');
+    
+    const medication = new Medication({ 
+      userId, 
+      name, 
+      form, 
+      image, 
+      note, 
+      times, 
+      quantity: quantityString, // Tự động tạo từ totalQuantity
+      totalQuantity: parsedTotalQuantity,
+      remainingQuantity: parsedTotalQuantity,
+      lowStockThreshold: lowStockThreshold || 5
+    });
+    
     await medication.save();
     res.status(201).json(medication);
   } catch (err) {
@@ -60,17 +82,66 @@ exports.getMedicationById = async (req, res) => {
   }
 };
 
-// Cập nhật thông tin thuốc
+// Cập nhật thông tin thuốc (gộp: update info + add stock + update threshold)
 exports.updateMedication = async (req, res) => {
   try {
-    const { name, form, image, note, times, quantity } = req.body;
-    const medication = await Medication.findByIdAndUpdate(
+    const { 
+      // Thông tin cơ bản
+      name, form, image, note, times, quantity,
+      // Quản lý số lượng
+      addedQuantity, lowStockThreshold 
+    } = req.body;
+    
+    const medication = await Medication.findById(req.params.id);
+    if (!medication) return res.status(404).json({ message: 'Không tìm thấy thuốc' });
+
+    // 1. Cập nhật thông tin cơ bản (nếu có)
+    const basicUpdates = {};
+    if (name !== undefined) basicUpdates.name = name;
+    if (form !== undefined) basicUpdates.form = form;
+    if (image !== undefined) basicUpdates.image = image;
+    if (note !== undefined) basicUpdates.note = note;
+    if (times !== undefined) basicUpdates.times = times;
+    if (quantity !== undefined) basicUpdates.quantity = quantity;
+
+    // 2. Xử lý mua thêm thuốc (nếu có addedQuantity)
+    if (addedQuantity && addedQuantity > 0) {
+      basicUpdates.remainingQuantity = medication.remainingQuantity + addedQuantity;
+      basicUpdates.totalQuantity = medication.totalQuantity + addedQuantity;
+      basicUpdates.isLowStock = false; // Reset cảnh báo khi mua thêm
+      basicUpdates.lastRefillDate = new Date();
+    }
+
+    // 3. Cập nhật ngưỡng cảnh báo (nếu có)
+    if (lowStockThreshold !== undefined && lowStockThreshold >= 0) {
+      basicUpdates.lowStockThreshold = lowStockThreshold;
+      // Kiểm tra lại trạng thái low stock với ngưỡng mới
+      const currentRemaining = basicUpdates.remainingQuantity || medication.remainingQuantity;
+      basicUpdates.isLowStock = currentRemaining <= lowStockThreshold;
+    }
+
+    // 4. Thực hiện update
+    const updatedMedication = await Medication.findByIdAndUpdate(
       req.params.id,
-      { name, form, image, note, times, quantity },
+      basicUpdates,
       { new: true }
     );
-    if (!medication) return res.status(404).json({ message: 'Không tìm thấy thuốc' });
-    res.json(medication);
+
+    // 5. Tạo response thống nhất
+    const response = {
+      success: true,
+      message: 'Cập nhật thuốc thành công',
+      data: updatedMedication
+    };
+
+    // Thêm thông tin về việc mua thêm nếu có
+    if (addedQuantity && addedQuantity > 0) {
+      response.addedQuantity = addedQuantity;
+      response.remainingQuantity = updatedMedication.remainingQuantity;
+      response.totalQuantity = updatedMedication.totalQuantity;
+    }
+
+    res.json(response);
   } catch (err) {
     res.status(400).json({ message: 'Không thể cập nhật thuốc', error: err.message });
   }
@@ -79,10 +150,44 @@ exports.updateMedication = async (req, res) => {
 // Xóa thuốc
 exports.deleteMedication = async (req, res) => {
   try {
-    const medication = await Medication.findByIdAndDelete(req.params.id);
+    const medicationId = req.params.id;
+    
+    // Kiểm tra thuốc có tồn tại không
+    const medication = await Medication.findById(medicationId);
     if (!medication) return res.status(404).json({ message: 'Không tìm thấy thuốc' });
-    res.json({ message: 'Đã xóa thuốc' });
+    
+    // Xóa tất cả dữ liệu liên quan đến thuốc này
+    await Promise.all([
+      Reminder.deleteMany({ medicationId: medicationId }),
+      MedicationHistory.deleteMany({ medicationId: medicationId })
+    ]);
+    
+    // Xóa thuốc
+    await Medication.findByIdAndDelete(medicationId);
+    
+    res.json({ 
+      message: 'Đã xóa thuốc và tất cả dữ liệu liên quan',
+      deletedMedicationId: medicationId
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server' });
+    console.error('Lỗi deleteMedication:', err);
+    res.status(500).json({ message: 'Lỗi server', error: err.message });
+  }
+};
+
+// Lấy danh sách thuốc sắp hết
+exports.getLowStockMedications = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.query.userId;
+    
+    if (!userId) {
+      return res.status(400).json({ message: 'Thiếu userId' });
+    }
+    
+    const medications = await MedicationQuantityService.getLowStockMedications(userId);
+    res.json(medications);
+  } catch (err) {
+    console.error('Lỗi getLowStockMedications:', err);
+    res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };

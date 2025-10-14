@@ -5,8 +5,10 @@ const Package = require('../models/Package');
 const Reminder = require('../models/Reminder');
 const Appointment = require('../models/Appointment');
 const Medication = require('../models/Medication');
+const MedicationHistory = require('../models/MedicationHistory');
 const BloodPressure = require('../models/BloodPressure');
 const medicationHistoryController = require('./medicationHistory.controller');
+const MedicationQuantityService = require('../services/medicationQuantity.service');
 const { getActivePackage, hasFeatureAccess } = require('../services/packageService');
 const { now, formatVN, formatPackageExpiry } = require('../utils/dateHelper');
 const Payment = require('../models/Payment');
@@ -802,13 +804,6 @@ exports.deletePatientMedicationReminder = async (req, res) => {
       });
     }
 
-    // Nếu reminder là voice, kiểm tra feature của bệnh nhân
-    if (reminder.reminderType === 'voice') {
-      const hasVoiceFeature = await hasFeatureAccess(patientId, 'Nhắc thuốc bằng giọng nói');
-      if (!hasVoiceFeature) {
-        return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói dịch vụ "Nhắc thuốc bằng giọng nói". Không thể xóa.' });
-      }
-    }
     const reminder = await Reminder.findOne({
       _id: reminderId,
       userId: patientId
@@ -819,6 +814,14 @@ exports.deletePatientMedicationReminder = async (req, res) => {
         success: false,
         message: 'Không tìm thấy lịch uống thuốc'
       });
+    }
+
+    // Nếu reminder là voice, kiểm tra feature của bệnh nhân
+    if (reminder.reminderType === 'voice') {
+      const hasVoiceFeature = await hasFeatureAccess(patientId, 'Nhắc thuốc bằng giọng nói');
+      if (!hasVoiceFeature) {
+        return res.status(403).json({ success: false, message: 'Người bệnh chưa có gói dịch vụ "Nhắc thuốc bằng giọng nói". Không thể xóa.' });
+      }
     }
 
     // Soft delete - set isActive to false
@@ -1165,7 +1168,7 @@ exports.getPatientFullOverview = async (req, res) => {
 exports.createMedicationForPatient = async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { name, form, image, note, times, quantity } = req.body;
+    const { name, form, image, note, times, quantity, totalQuantity, lowStockThreshold } = req.body;
     const relativeId = req.user._id;
 
     // Kiểm tra quyền
@@ -1185,6 +1188,9 @@ exports.createMedicationForPatient = async (req, res) => {
       });
     }
 
+    // Parse quantity nếu là string
+    const parsedTotalQuantity = totalQuantity || parseInt(quantity) || 0;
+
     // Tạo medication mới
     const medication = new Medication({
       userId: patientId,
@@ -1193,7 +1199,10 @@ exports.createMedicationForPatient = async (req, res) => {
       image,
       note: note || `Thuốc được thêm bởi người thân: ${req.user.fullName}`,
       times,
-      quantity,
+      quantity, // Giữ nguyên để tương thích
+      totalQuantity: parsedTotalQuantity,
+      remainingQuantity: parsedTotalQuantity,
+      lowStockThreshold: lowStockThreshold || 5,
       createdBy: req.user._id,
       createdByType: 'relative'
     });
@@ -1213,11 +1222,16 @@ exports.createMedicationForPatient = async (req, res) => {
   }
 };
 
-// Cập nhật thuốc của bệnh nhân (bởi người thân)
+// Cập nhật thuốc của bệnh nhân (bởi người thân) - Gộp update + add stock + threshold
 exports.updatePatientMedication = async (req, res) => {
   try {
     const { patientId, medicationId } = req.params;
-    const updateData = req.body;
+    const { 
+      // Thông tin cơ bản
+      name, form, image, note, times, quantity,
+      // Quản lý số lượng
+      addedQuantity, lowStockThreshold 
+    } = req.body;
     const relativeId = req.user._id;
 
     // Kiểm tra quyền
@@ -1249,15 +1263,53 @@ exports.updatePatientMedication = async (req, res) => {
       });
     }
 
-    // Cập nhật medication
-    Object.assign(medication, updateData);
-    await medication.save();
+    // 1. Cập nhật thông tin cơ bản (nếu có)
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (form !== undefined) updates.form = form;
+    if (image !== undefined) updates.image = image;
+    if (note !== undefined) updates.note = note;
+    if (times !== undefined) updates.times = times;
+    if (quantity !== undefined) updates.quantity = quantity;
 
-    res.json({
+    // 2. Xử lý mua thêm thuốc (nếu có addedQuantity)
+    if (addedQuantity && addedQuantity > 0) {
+      updates.remainingQuantity = medication.remainingQuantity + addedQuantity;
+      updates.totalQuantity = medication.totalQuantity + addedQuantity;
+      updates.isLowStock = false; // Reset cảnh báo khi mua thêm
+      updates.lastRefillDate = new Date();
+    }
+
+    // 3. Cập nhật ngưỡng cảnh báo (nếu có)
+    if (lowStockThreshold !== undefined && lowStockThreshold >= 0) {
+      updates.lowStockThreshold = lowStockThreshold;
+      // Kiểm tra lại trạng thái low stock với ngưỡng mới
+      const currentRemaining = updates.remainingQuantity || medication.remainingQuantity;
+      updates.isLowStock = currentRemaining <= lowStockThreshold;
+    }
+
+    // 4. Thực hiện update
+    const updatedMedication = await Medication.findByIdAndUpdate(
+      medicationId,
+      updates,
+      { new: true }
+    );
+
+    // 5. Tạo response thống nhất
+    const response = {
       success: true,
       message: 'Cập nhật thuốc thành công',
-      data: medication
-    });
+      data: updatedMedication
+    };
+
+    // Thêm thông tin về việc mua thêm nếu có
+    if (addedQuantity && addedQuantity > 0) {
+      response.addedQuantity = addedQuantity;
+      response.remainingQuantity = updatedMedication.remainingQuantity;
+      response.totalQuantity = updatedMedication.totalQuantity;
+    }
+
+    res.json(response);
   } catch (error) {
     if (error.message.includes('quyền')) {
       return res.status(403).json({ success: false, message: error.message });
@@ -1289,6 +1341,12 @@ exports.deletePatientMedication = async (req, res) => {
       });
     }
 
+    // Xóa tất cả dữ liệu liên quan đến thuốc này
+    await Promise.all([
+      Reminder.deleteMany({ medicationId: medicationId }),
+      MedicationHistory.deleteMany({ medicationId: medicationId })
+    ]);
+
     const medication = await Medication.findOneAndDelete({
       _id: medicationId,
       userId: patientId
@@ -1303,7 +1361,8 @@ exports.deletePatientMedication = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Xóa thuốc thành công'
+      message: 'Xóa thuốc và tất cả dữ liệu liên quan thành công',
+      deletedMedicationId: medicationId
     });
   } catch (error) {
     if (error.message.includes('quyền')) {
@@ -1496,3 +1555,45 @@ exports.createMedicationsFromOcrImageForPatient = async (req, res) => {
     res.status(500).json({ message: 'Lỗi OCR và lưu thuốc', error: err.message });
   }
 };
+
+
+
+// Lấy danh sách thuốc sắp hết của bệnh nhân (bởi người thân)
+exports.getPatientLowStockMedications = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+
+    // Kiểm tra quyền
+    const relationship = await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    // Nếu permissions trống => từ chối
+    if (!relationship.permissions || relationship.permissions.length === 0) {
+      return res.status(403).json({ success: false, message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền.' });
+    }
+
+    // Kiểm tra quyền manage_health_data hoặc schedule_medication
+    if (!relationship.permissions.includes('manage_health_data') && 
+        !relationship.permissions.includes('schedule_medication')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xem thông tin thuốc của bệnh nhân'
+      });
+    }
+
+    const medications = await MedicationQuantityService.getLowStockMedications(patientId);
+    
+    res.json({
+      success: true,
+      message: 'Lấy danh sách thuốc sắp hết thành công',
+      data: medications
+    });
+  } catch (error) {
+    if (error.message.includes('quyền')) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+

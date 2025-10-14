@@ -22,6 +22,9 @@ require('./src/jobs/reminderJob');
 // Import package expiry job để job tự động chạy
 const { startPackageJobs } = require('./src/jobs/packageExpiryJob');
 
+// Import medication stock job để job tự động chạy
+require('./src/jobs/medicationStockJob');
+
 
 var indexRouter = require('./src/routes/index');
 var usersRouter = require('./src/routes/users');
@@ -130,5 +133,10 @@ app.use(function(err, req, res, next) {
     error: req.app.get('env') === 'development' ? err : {}
   });
 });
+
+// Khởi động các background jobs
+console.log('🚀 Starting background jobs...');
+startPackageJobs();
+console.log('✅ All background jobs started successfully!');
 
 module.exports = app;

@@ -1,52 +1,5 @@
 /**
  * @swagger
- * /medications/from-ocr:
- *   post:
- *     summary: Lưu nhiều thuốc từ kết quả OCR
- *     tags: [Medications]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               userId:
- *                 type: string
- *                 description: ID người dùng
- *               medicines:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                     quantity:
- *                       type: string
- *                     form:
- *                       type: string
- *                     usage:
- *                       type: string
- *               imageUrl:
- *                 type: string
- *                 description: URL ảnh đơn thuốc
- *               rawText:
- *                 type: string
- *                 description: Văn bản OCR gốc
- *     responses:
- *       201:
- *         description: Danh sách thuốc đã lưu
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Medication'
- *       400:
- *         description: Dữ liệu không hợp lệ
- */
-/**
- * @swagger
  * tags:
  *   name: Medications
  *   description: Quản lý thuốc cho nhắc nhở cao huyết áp
@@ -110,6 +63,67 @@
  *             schema:
  *               $ref: '#/components/schemas/Medication'
  *
+ * /medications/low-stock:
+ *   get:
+ *     summary: Lấy danh sách thuốc sắp hết
+ *     tags: [Medications]
+ *     responses:
+ *       200:
+ *         description: Danh sách thuốc sắp hết
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Medication'
+ *       500:
+ *         description: Lỗi server
+ *
+ * /medications/from-ocr:
+ *   post:
+ *     summary: Lưu nhiều thuốc từ kết quả OCR
+ *     tags: [Medications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: ID người dùng
+ *               medicines:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     quantity:
+ *                       type: string
+ *                     form:
+ *                       type: string
+ *                     usage:
+ *                       type: string
+ *               imageUrl:
+ *                 type: string
+ *                 description: URL ảnh đơn thuốc
+ *               rawText:
+ *                 type: string
+ *                 description: Văn bản OCR gốc
+ *     responses:
+ *       201:
+ *         description: Danh sách thuốc đã lưu
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Medication'
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *
  * /medications/{id}:
  *   get:
  *     summary: Xem chi tiết thuốc
@@ -132,12 +146,6 @@
  *         description: Không tìm thấy thuốc
  *   put:
  *     summary: Cập nhật thông tin thuốc (gộp update + mua thêm + đặt ngưỡng)
- *     description: |
- *       Endpoint đa năng cho phép:
- *       - Cập nhật thông tin cơ bản (tên, ghi chú, v.v.)
- *       - Mua thêm thuốc qua addedQuantity
- *       - Đặt ngưỡng cảnh báo qua lowStockThreshold
- *       - Hoặc kết hợp tất cả cùng lúc
  *     tags: [Medications]
  *     parameters:
  *       - in: path
@@ -161,34 +169,31 @@
  *                 description: Dạng thuốc
  *               image:
  *                 type: string
- *                 description: URL ảnh thuốc
+ *                 description: Ảnh thuốc
  *               note:
  *                 type: string
  *                 description: Ghi chú
  *               times:
  *                 type: array
- *                 description: Lịch uống thuốc theo thời gian trong ngày
+ *                 description: Thời gian uống thuốc
  *                 items:
  *                   type: object
  *                   properties:
  *                     time:
  *                       type: string
  *                       enum: [Sáng, Chiều, Tối]
- *                       description: Buổi uống thuốc
  *                     dosage:
  *                       type: string
- *                       description: Liều lượng uống (ví dụ "1 viên", "2 viên")
- *                   required: [time, dosage]
  *               quantity:
  *                 type: string
- *                 description: Mô tả số lượng
+ *                 description: Mô tả số lượng (tương thích cũ)
  *               addedQuantity:
  *                 type: number
- *                 description: Số lượng thêm vào (mua thêm)
+ *                 description: Số lượng thuốc thêm vào (mua thêm)
  *                 example: 10
  *               lowStockThreshold:
  *                 type: number
- *                 description: Ngưỡng cảnh báo
+ *                 description: Ngưỡng cảnh báo (số viên)
  *                 example: 5
  *           examples:
  *             updateBasicInfo:
@@ -196,14 +201,6 @@
  *               value:
  *                 name: "Paracetamol 500mg"
  *                 note: "Uống sau ăn"
- *             updateTimes:
- *               summary: Cập nhật thời gian uống thuốc
- *               value:
- *                 times:
- *                   - time: "Sáng"
- *                     dosage: "1 viên"
- *                   - time: "Tối"
- *                     dosage: "1 viên"
  *             addStock:
  *               summary: Chỉ mua thêm thuốc
  *               value:
@@ -217,18 +214,11 @@
  *               value:
  *                 name: "Paracetamol 500mg Updated"
  *                 note: "Uống sau ăn, tránh đói"
- *                 times:
- *                   - time: "Sáng"
- *                     dosage: "2 viên"
- *                   - time: "Chiều"
- *                     dosage: "1 viên"
- *                   - time: "Tối"
- *                     dosage: "1 viên"
  *                 addedQuantity: 5
  *                 lowStockThreshold: 10
  *     responses:
  *       200:
- *         description: Cập nhật thành công
+ *         description: Cập nhật thuốc thành công
  *         content:
  *           application/json:
  *             schema:
@@ -242,10 +232,13 @@
  *                   $ref: '#/components/schemas/Medication'
  *                 addedQuantity:
  *                   type: number
+ *                   description: Số lượng đã thêm (chỉ có khi mua thêm)
  *                 remainingQuantity:
  *                   type: number
+ *                   description: Số lượng còn lại sau khi thêm
  *                 totalQuantity:
  *                   type: number
+ *                   description: Tổng số lượng sau khi thêm
  *       404:
  *         description: Không tìm thấy thuốc
  *   delete:
@@ -263,23 +256,4 @@
  *         description: Đã xóa thuốc
  *       404:
  *         description: Không tìm thấy thuốc
- */
-
-/**
- * @swagger
- * /medications/low-stock:
- *   get:
- *     summary: Lấy danh sách thuốc sắp hết
- *     tags: [Medications]
- *     responses:
- *       200:
- *         description: Danh sách thuốc sắp hết
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Medication'
- *       500:
- *         description: Lỗi server
  */
