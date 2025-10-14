@@ -26,14 +26,18 @@ class MedicationQuantityService {
       // Cập nhật số lượng còn lại
       await Medication.findByIdAndUpdate(medicationId, {
         remainingQuantity: newRemainingQuantity,
-        isLowStock: isNowLowStock
+        // KHÔNG set isLowStock để cron job có thể detect
+        // isLowStock: isNowLowStock
       });
 
       // Gửi thông báo chỉ khi chuyển từ không low stock sang low stock
       if (isNowLowStock && !wasLowStock) {
-        // Cập nhật object medication với giá trị mới để gửi thông báo chính xác
-        medication.remainingQuantity = newRemainingQuantity;
-        await this.sendLowStockNotification(medication);
+        // TẮT REAL-TIME - CHỈ DÙNG CRON JOB
+        console.log(`[REAL-TIME] Thuốc ${medication.name} sắp hết (${newRemainingQuantity} viên) - CHỜ CRON JOB THÔNG BÁO`);
+        
+        // KHÔNG gửi notification ngay
+        // medication.remainingQuantity = newRemainingQuantity;
+        // await this.sendLowStockNotification(medication);
       }
 
       return { success: true, remainingQuantity: newRemainingQuantity };

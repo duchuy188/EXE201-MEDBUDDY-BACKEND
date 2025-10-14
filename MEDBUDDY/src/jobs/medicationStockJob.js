@@ -3,29 +3,47 @@ const Medication = require('../models/Medication');
 const MedicationQuantityService = require('../services/medicationQuantity.service');
 const mongoose = require('mongoose');
 
-// Job chạy mỗi 2 tiếng để kiểm tra thuốc sắp hết
-const medicationStockJob = cron.schedule('0 */2 * * *', async () => {
+// Job chạy mỗi 10 phút để kiểm tra thuốc sắp hết
+const medicationStockJob = cron.schedule('*/10 * * * *', async () => {
   try {
-    console.log('[STOCK-JOB] Bắt đầu kiểm tra thuốc sắp hết...');
+    const now = new Date();
+    const vnTime = now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    console.log(`[STOCK-JOB] Bắt đầu kiểm tra thuốc sắp hết... Giờ VN: ${vnTime}`);
     
-    // Lấy tất cả thuốc có số lượng <= ngưỡng cảnh báo và chưa được cảnh báo
+    // Thời gian 12 tiếng trước
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    
+    // Lấy thuốc sắp hết: LẦN ĐẦU hoặc ĐÃ QUA 12 TIẾNG kể từ lần báo cuối
     const lowStockMedications = await Medication.find({
       $expr: { $lte: ['$remainingQuantity', '$lowStockThreshold'] },
-      isLowStock: false,
-      remainingQuantity: { $gt: 0 } // Chỉ cảnh báo khi còn thuốc, không cảnh báo khi hết hoàn toàn
+      remainingQuantity: { $gt: 0 }, // Chỉ cảnh báo khi còn thuốc
+      $or: [
+        { isLowStock: false }, // Lần đầu tiên
+        { 
+          isLowStock: true,
+          $or: [
+            { lastNotificationDate: { $exists: false } }, // Chưa có field này
+            { lastNotificationDate: { $lt: twelveHoursAgo } } // Đã quá 12 tiếng
+          ]
+        }
+      ]
     }).populate('userId');
 
-    console.log(`[STOCK-JOB] Tìm thấy ${lowStockMedications.length} thuốc sắp hết`);
+    console.log(`[STOCK-JOB] Tìm thấy ${lowStockMedications.length} thuốc cần thông báo`);
 
     // Gửi thông báo cho từng thuốc
     for (const medication of lowStockMedications) {
       try {
         await MedicationQuantityService.sendLowStockNotification(medication);
         
-        // Đánh dấu đã cảnh báo
-        await Medication.findByIdAndUpdate(medication._id, { isLowStock: true });
+        // Đánh dấu đã cảnh báo và cập nhật thời gian báo cuối
+        await Medication.findByIdAndUpdate(medication._id, { 
+          isLowStock: true,
+          lastNotificationDate: new Date()
+        });
         
-        console.log(`[STOCK-JOB] Đã gửi thông báo cho thuốc: ${medication.name} (${medication.remainingQuantity}/${medication.totalQuantity} viên)`);
+        const isRepeat = medication.lastNotificationDate ? "(lặp lại) " : "";
+        console.log(`[STOCK-JOB] Đã gửi thông báo ${isRepeat}cho thuốc: ${medication.name} (${medication.remainingQuantity}/${medication.totalQuantity} viên)`);
       } catch (error) {
         console.error(`[STOCK-JOB] Lỗi gửi thông báo cho thuốc ${medication.name}:`, error);
       }
@@ -45,13 +63,25 @@ const outOfStockJob = cron.schedule('0 18 * * *', async () => {
   try {
     console.log('[OUT-OF-STOCK-JOB] Bắt đầu kiểm tra thuốc đã hết...');
     
-    // Lấy tất cả thuốc đã hết hoàn toàn
+    // Thời gian 12 tiếng trước
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    
+    // Lấy thuốc đã hết: LẦN ĐẦU hoặc ĐÃ QUA 12 TIẾNG
     const outOfStockMedications = await Medication.find({
       remainingQuantity: 0,
-      isLowStock: false
+      $or: [
+        { isLowStock: false }, // Lần đầu
+        { 
+          isLowStock: true,
+          $or: [
+            { lastNotificationDate: { $exists: false } },
+            { lastNotificationDate: { $lt: twelveHoursAgo } }
+          ]
+        }
+      ]
     }).populate('userId');
 
-    console.log(`[OUT-OF-STOCK-JOB] Tìm thấy ${outOfStockMedications.length} thuốc đã hết`);
+    console.log(`[OUT-OF-STOCK-JOB] Tìm thấy ${outOfStockMedications.length} thuốc đã hết cần thông báo`);
 
     // Gửi thông báo cho từng thuốc
     for (const medication of outOfStockMedications) {
@@ -78,10 +108,14 @@ const outOfStockJob = cron.schedule('0 18 * * *', async () => {
           });
         }
         
-        // Đánh dấu đã cảnh báo
-        await Medication.findByIdAndUpdate(medication._id, { isLowStock: true });
+        // Đánh dấu đã cảnh báo và cập nhật thời gian
+        await Medication.findByIdAndUpdate(medication._id, { 
+          isLowStock: true,
+          lastNotificationDate: new Date()
+        });
         
-        console.log(`[OUT-OF-STOCK-JOB] Đã gửi thông báo hết thuốc cho: ${medication.name}`);
+        const isRepeat = medication.lastNotificationDate ? "(lặp lại) " : "";
+        console.log(`[OUT-OF-STOCK-JOB] Đã gửi thông báo ${isRepeat}hết thuốc cho: ${medication.name}`);
       } catch (error) {
         console.error(`[OUT-OF-STOCK-JOB] Lỗi gửi thông báo cho thuốc ${medication.name}:`, error);
       }
@@ -98,5 +132,6 @@ const outOfStockJob = cron.schedule('0 18 * * *', async () => {
 
 // Jobs tự động chạy khi được import
 console.log('[STOCK-JOBS] 🔔 Medication stock notification jobs started!');
-console.log('[STOCK-JOBS] ⏰ Low stock check: Every 2 hours');
-console.log('[STOCK-JOBS] ⏰ Out of stock check: Daily at 6:00 PM');
+console.log('[STOCK-JOBS] ⏰ Low stock check: Every 10 minutes (Vietnam timezone)');
+console.log('[STOCK-JOBS] ⏰ Out of stock check: Daily at 6:00 PM (Vietnam timezone)');
+console.log('[STOCK-JOBS] 🔄 Repeat notifications: Every 12 hours for persistent low stock');
