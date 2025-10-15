@@ -7,10 +7,16 @@ const fcmService = require('../services/fcmService');
 cron.schedule('* * * * *', async () => {
   try {
     const now = new Date();
-    const currentDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
-    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    
-    console.log(`[JOB] Kiểm tra lúc ${currentDate} ${currentTime}`);
+    // Use server local date to avoid UTC vs local timezone mismatch
+    const currentDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')
+    ].join('-'); // YYYY-MM-DD in server local timezone
+    const currentTime = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+    // Detailed log: include both local and ISO strings so timezone issues are visible in logs
+    console.log(`[JOB] Kiểm tra lúc ${currentDate} ${currentTime} (server local) - now=${now.toString()} - iso=${now.toISOString()}`);
 
     // BƯỚC 1: Tìm tất cả reminders đang active
     const reminders = await Reminder.find({
@@ -114,6 +120,75 @@ cron.schedule('* * * * *', async () => {
         );
         console.log(`[JOB] Đã gửi thông báo snooze cho ${reminder.userId._id}`);
       }
+    }
+
+    // --- Gửi thông báo cho Appointment (tái khám) ---
+    try {
+      const Appointment = require('../models/Appointment');
+      const appointments = await Appointment.find({
+        status: 'pending',
+        userId: { $exists: true },
+        $expr: {
+          $and: [
+            { $eq: [{ $dateToString: { format: "%Y-%m-%d", date: "$date" } }, currentDate] },
+            { $eq: ["$time", currentTime] }
+          ]
+        }
+      }).populate('userId');
+
+      console.log(`[JOB] appointments tìm được: ${appointments.length}`);
+
+      for (const appointment of appointments) {
+        const tokens = await require('../models/NotificationToken').find({ userId: appointment.userId._id });
+        if (!tokens.length) {
+          console.log('[JOB] No notification tokens for appointment user', appointment.userId._id);
+        }
+        for (const tokenDoc of tokens) {
+          try {
+            await fcmService.sendNotification(
+              String(tokenDoc.deviceToken),
+              'Lịch hẹn tái khám',
+              appointment.notes || 'Đã đến lịch tái khám'
+            );
+          } catch (err) {
+            console.error('[JOB] Error sending appointment notification to token', tokenDoc.deviceToken, err.message || err);
+          }
+        }
+        appointment.status = 'notified';
+        await appointment.save();
+      }
+    } catch (err) {
+      console.error('[JOB] Error processing appointments:', err.message || err);
+    }
+
+    // --- Xử lý nhắc đo huyết áp ---
+    try {
+      const BloodPressureReminder = require('../models/BloodPressureReminder');
+      const bpReminders = await BloodPressureReminder.find({ isActive: true }).populate('userId');
+      const bpRemindersToSend = bpReminders.filter(reminder =>
+        Array.isArray(reminder.times) &&
+        reminder.times.some(t => t.time === currentTime)
+      );
+
+      console.log(`[JOB] bloodPressureReminders to send: ${bpRemindersToSend.length}`);
+
+      for (const reminder of bpRemindersToSend) {
+        const tokens = await require('../models/NotificationToken').find({ userId: reminder.userId._id });
+        if (!tokens.length) console.log('[JOB] No notification tokens for bp reminder user', reminder.userId._id);
+        for (const tokenDoc of tokens) {
+          try {
+            await fcmService.sendNotification(
+              String(tokenDoc.deviceToken),
+              'Nhắc đo huyết áp',
+              reminder.note || 'Đã đến giờ đo huyết áp!'
+            );
+          } catch (err) {
+            console.error('[JOB] Error sending BP reminder to token', tokenDoc.deviceToken, err.message || err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[JOB] Error processing blood pressure reminders:', err.message || err);
     }
 
   } catch (err) {

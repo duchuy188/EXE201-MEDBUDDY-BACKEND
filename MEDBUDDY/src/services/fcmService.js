@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const NotificationToken = require('../models/NotificationToken');
 
 // Tạo service account object từ environment variables
 const serviceAccount = {
@@ -46,6 +47,30 @@ async function sendNotification(registrationToken, title, body, sound = "default
     return response;
   } catch (error) {
     console.error('Gửi thất bại:', error);
+
+    // Normalize possible error code locations
+    const errCode = error.code || (error.errorInfo && error.errorInfo.code);
+
+    // If token is not registered anymore or invalid, remove it from DB to avoid future failures
+    const removableCodes = ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'];
+    try {
+      if (removableCodes.includes(errCode)) {
+        // Attempt to remove the invalid token from NotificationToken collection
+        const deleteResult = await NotificationToken.findOneAndDelete({ deviceToken: registrationToken });
+        if (deleteResult) {
+          console.log('[FCM] Removed invalid device token from DB:', registrationToken);
+        } else {
+          console.log('[FCM] Invalid device token not found in DB (could be already removed):', registrationToken);
+        }
+
+        // Don't throw error for not-registered tokens; caller can treat null/undefined response as failure
+        return null;
+      }
+    } catch (cleanupErr) {
+      console.error('[FCM] Error while cleaning up invalid token:', cleanupErr);
+      // fallthrough to rethrow original error
+    }
+
     throw error;
   }
 }
