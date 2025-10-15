@@ -87,6 +87,9 @@ router.get('/patients/:patientId/blood-pressures', authMiddleware, relativePatie
 // Lấy lần đo huyết áp mới nhất của bệnh nhân (cho người thân)
 router.get('/patients/:patientId/blood-pressures/latest', authMiddleware, relativePatientController.getPatientLatestBloodPressure);
 
+// Lấy AI insights của bệnh nhân (cho người thân)
+router.get('/patients/:patientId/ai-insights', authMiddleware, requireFeatureForUser('Phân tích AI huyết áp'), relativePatientController.getPatientAIInsights);
+
 // Lấy tổng quan tuần uống thuốc của bệnh nhân (cho người thân)
 router.get('/patients/:patientId/medication-history/weekly', authMiddleware, relativePatientController.getPatientWeeklyOverview);
 

@@ -13,6 +13,7 @@ const MedicationSchema = new mongoose.Schema({
   remainingQuantity: { type: Number, default: 0 }, // Số lượng còn lại
   lowStockThreshold: { type: Number, default: 5 }, // Ngưỡng cảnh báo (mặc định 5 viên)
   isLowStock: { type: Boolean, default: false }, // Đã cảnh báo chưa
+  lastNotificationDate: { type: Date }, // Thời gian gửi thông báo gần nhất
   lastRefillDate: { type: Date }, // Ngày mua thêm gần nhất
   
   times: [{

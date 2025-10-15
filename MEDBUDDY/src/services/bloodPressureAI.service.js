@@ -350,6 +350,7 @@ class BloodPressureAIService {
         isArchived: false
       })
       .populate('bloodPressureId', 'systolic diastolic measuredAt')
+      .populate('userId', 'fullName')
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -427,8 +428,8 @@ class BloodPressureAIService {
         const response = await result.response;
         text = response.text();
       } catch (apiError) {
-        // Thử với model cũ hơn nếu model mới không hoạt động
-        this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+        // Thử với model khác nếu model chính không hoạt động
+        this.model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const result = await this.model.generateContent(prompt);
         const response = await result.response;
         text = response.text();

@@ -94,7 +94,7 @@ exports.addRelativePatient = async (req, res) => {
     const newLink = await RelativePatient.create({ patient: patientId, relative: relative._id, status: 'pending', otp, otpExpiresAt });
 
     // Gửi email thông báo tới người thân
-    await sendInviteEmail(relative.email, relative.fullName, req.user.fullName, `Mã OTP xác nhận liên kết: <b>${otp}</b>`);
+    await sendInviteEmail(relative.email, relative.fullName, req.user.fullName, '', otp);
 
     return res.status(201).json({ message: 'Đã gửi mã OTP xác nhận tới email người bệnh.', linkId: newLink._id });
   } catch (err) {
@@ -120,7 +120,7 @@ exports.confirmRelativePatient = async (req, res) => {
       return res.status(400).json({ message: 'Mã OTP không đúng.' });
     }
     link.status = 'accepted';
-    link.permissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
+    link.permissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment', 'manage_health_data'];
     link.otp = undefined;
     link.otpExpiresAt = undefined;
     await link.save();
@@ -215,7 +215,7 @@ exports.addPatientForRelative = async (req, res) => {
     const newLink = await RelativePatient.create({ patient: patient._id, relative: relativeId, status: 'pending', otp, otpExpiresAt });
 
     // Gửi email thông báo tới người bệnh
-    await sendInviteEmail(patient.email, patient.fullName, req.user.fullName, `Mã OTP xác nhận liên kết: <b>${otp}</b>`);
+    await sendInviteEmail(patient.email, patient.fullName, req.user.fullName, '', otp);
 
     return res.status(201).json({ message: 'Đã gửi mã OTP xác nhận tới email người bệnh.', linkId: newLink._id });
   } catch (err) {
@@ -982,7 +982,7 @@ exports.fixExistingPermissions = async (req, res) => {
       ]
     });
 
-    const defaultPermissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
+    const defaultPermissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment', 'manage_health_data'];
     
     for (let relationship of relationships) {
       relationship.permissions = defaultPermissions;
@@ -1047,7 +1047,7 @@ exports.quickFixPermissions = async (req, res) => {
     }
 
     // Cập nhật permissions mặc định
-    const defaultPermissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment'];
+    const defaultPermissions = ['view_medical_records', 'schedule_medication', 'schedule_appointment', 'manage_health_data'];
     relationship.permissions = defaultPermissions;
     await relationship.save();
 
@@ -1595,5 +1595,73 @@ exports.getPatientLowStockMedications = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Lấy AI insights của bệnh nhân cho người thân
+exports.getPatientAIInsights = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const relativeId = req.user._id;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Kiểm tra quyền
+    const relationship = await checkRelativePermission(patientId, relativeId, req.user.role);
+
+    // Nếu permissions trống => từ chối
+    if (!relationship.permissions || relationship.permissions.length === 0) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Người thân chưa được cấp quyền. Vui lòng yêu cầu bệnh nhân cấp quyền.' 
+      });
+    }
+
+    // Kiểm tra quyền manage_health_data
+    if (!relationship.permissions.includes('manage_health_data')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xem phân tích AI của bệnh nhân'
+      });
+    }
+
+    // Validate limit
+    if (limit < 1 || limit > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit phải từ 1 đến 50'
+      });
+    }
+
+    // Import BloodPressureAIService
+    const BloodPressureAIService = require('../services/bloodPressureAI.service');
+    const aiService = new BloodPressureAIService();
+
+    // Lấy AI insights của bệnh nhân
+    const result = await aiService.getAIInsights(patientId, limit);
+
+    res.json({
+      success: true,
+      message: 'AI insights của bệnh nhân',
+      data: {
+        insights: result.insights,
+        overallStats: result.overallStats,
+        count: result.insights.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Get Patient AI Insights Error:', error);
+    
+    if (error.message && error.message.includes('quyền')) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy AI insights của bệnh nhân',
+      error: error.message
+    });
+  }
+};
+
+
 
 

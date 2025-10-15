@@ -113,7 +113,9 @@ const AIAnalysisSchema = new mongoose.Schema({
     comment: { type: String }
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Indexes cho performance

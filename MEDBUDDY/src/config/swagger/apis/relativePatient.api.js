@@ -1046,3 +1046,110 @@
  *       500:
  *         description: Lỗi server
  */
+
+/**
+ * @swagger
+ * /api/relative-patient/patients/{patientId}/ai-insights:
+ *   get:
+ *     tags:
+ *       - RelativePatient
+ *     summary: Lấy AI insights của bệnh nhân (cho người thân)
+ *     description: Người thân có thể xem phân tích AI huyết áp của bệnh nhân nếu có quyền manage_health_data
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của bệnh nhân
+ *         example: "60f7b3b3b3b3b3b3b3b3b3b3"
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 10
+ *         description: Số lượng insights muốn lấy
+ *     responses:
+ *       200:
+ *         description: Lấy AI insights thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "AI insights của bệnh nhân"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     insights:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/AIAnalysisResult'
+ *                     overallStats:
+ *                       $ref: '#/components/schemas/AIOverallStats'
+ *                     count:
+ *                       type: integer
+ *                       example: 5
+ *       400:
+ *         description: Tham số không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Limit phải từ 1 đến 50"
+ *       403:
+ *         description: Không có quyền truy cập
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Bạn không có quyền xem phân tích AI của bệnh nhân"
+ *       404:
+ *         description: Không tìm thấy dữ liệu
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Chưa có phân tích AI nào cho bệnh nhân này"
+ *       500:
+ *         description: Lỗi server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Lỗi server khi lấy AI insights của bệnh nhân"
+ */
