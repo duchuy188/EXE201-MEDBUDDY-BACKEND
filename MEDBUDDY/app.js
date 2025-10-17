@@ -25,6 +25,9 @@ const { startPackageJobs } = require('./src/jobs/packageExpiryJob');
 // Import medication stock job để job tự động chạy
 require('./src/jobs/medicationStockJob');
 
+// Import payment cleanup job (auto-expire pending PayOS payments after 20 minutes)
+require('./src/jobs/paymentCleanupJob');
+
 
 var indexRouter = require('./src/routes/index');
 var usersRouter = require('./src/routes/users');
@@ -51,29 +54,29 @@ app.use(express.json()); // Đảm bảo parse body trước các route
 
 // Route test gửi notification qua Expo
 const { sendExpoNotification } = require('./src/services/expoService');
-app.post('/test-expo', async (req, res) => {
-  if (!req.body) {
-    return res.status(400).json({ error: 'Missing request body' });
-  }
-  const { token, title, body, data } = req.body;
-  if (!token) {
-    return res.status(400).json({ error: 'Missing Expo push token' });
-  }
-  try {
-    const result = await sendExpoNotification(token, title, body, data);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+app.post('/test-expo', async(req, res) => {
+    if (!req.body) {
+        return res.status(400).json({ error: 'Missing request body' });
+    }
+    const { token, title, body, data } = req.body;
+    if (!token) {
+        return res.status(400).json({ error: 'Missing Expo push token' });
+    }
+    try {
+        const result = await sendExpoNotification(token, title, body, data);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // CORS configuration - Simplified for development
 app.use(cors({
-  origin: true,  // Cho phép tất cả origins trong development
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  optionsSuccessStatus: 200
+    origin: true, // Cho phép tất cả origins trong development
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    optionsSuccessStatus: 200
 }));
 
 
@@ -107,33 +110,33 @@ app.use('/ocr', ocrRouter); // Nếu như này thì endpoint là /ocr/ocr
 
 // Swagger UI route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  swaggerOptions: {
-    authAction: {
-      JWT: {
-        name: "JWT",
-        schema: {
-          type: "apiKey",
-          in: "header",
-          name: "Authorization",
-          description: "Enter JWT Bearer token **_only_**"
-        },
-        value: "Bearer <JWT>"
-      }
+    swaggerOptions: {
+        authAction: {
+            JWT: {
+                name: "JWT",
+                schema: {
+                    type: "apiKey",
+                    in: "header",
+                    name: "Authorization",
+                    description: "Enter JWT Bearer token **_only_**"
+                },
+                value: "Bearer <JWT>"
+            }
+        }
     }
-  }
 }));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
-  next(createError(404));
+    next(createError(404));
 });
 
 // error handler
 app.use(function(err, req, res, next) {
-  res.status(err.status || 500).json({
-    message: err.message,
-    error: req.app.get('env') === 'development' ? err : {}
-  });
+    res.status(err.status || 500).json({
+        message: err.message,
+        error: req.app.get('env') === 'development' ? err : {}
+    });
 });
 
 // Khởi động các background jobs
