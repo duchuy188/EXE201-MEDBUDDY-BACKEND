@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const relativePatientController = require('../controllers/relativePatient.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
-const { requireFeatureForUser } = require('../middlewares/packageAccess.middleware');
+const { requireFeatureForUser, requireActivePackageForUser } = require('../middlewares/packageAccess.middleware');
 const upload = require('../middlewares/upload.middleware');
 
 // API khởi tạo 3 gói dịch vụ
@@ -31,8 +31,13 @@ router.put('/package/:id', authMiddleware, relativePatientController.updatePacka
 
 // ========== API ĐẶT LỊCH CHO BỆNH NHÂN BỞI NGƯỜI THÂN ==========
 
-// Đặt lịch uống thuốc cho bệnh nhân
-router.post('/patients/:patientId/medication-reminder', authMiddleware, relativePatientController.createMedicationReminderForPatient);
+// Đặt lịch uống thuốc cho bệnh nhân (yêu cầu gói active của người bệnh)
+router.post(
+    '/patients/:patientId/medication-reminder',
+    authMiddleware,
+    requireActivePackageForUser('patientId'),
+    relativePatientController.createMedicationReminderForPatient
+);
 
 // Đặt lịch tái khám cho bệnh nhân
 router.post('/patients/:patientId/appointment', authMiddleware, relativePatientController.createAppointmentForPatient);
@@ -87,8 +92,8 @@ router.get('/patients/:patientId/blood-pressures', authMiddleware, relativePatie
 // Lấy lần đo huyết áp mới nhất của bệnh nhân (cho người thân)
 router.get('/patients/:patientId/blood-pressures/latest', authMiddleware, relativePatientController.getPatientLatestBloodPressure);
 
-// Lấy AI insights của bệnh nhân (cho người thân)
-router.get('/patients/:patientId/ai-insights', authMiddleware, requireFeatureForUser('Phân tích AI huyết áp'), relativePatientController.getPatientAIInsights);
+// Lấy AI insights của bệnh nhân (cho người thân) — chỉ cần bệnh nhân có gói active
+router.get('/patients/:patientId/ai-insights', authMiddleware, requireActivePackageForUser('patientId'), relativePatientController.getPatientAIInsights);
 
 // Lấy tổng quan tuần uống thuốc của bệnh nhân (cho người thân)
 router.get('/patients/:patientId/medication-history/weekly', authMiddleware, relativePatientController.getPatientWeeklyOverview);
@@ -98,14 +103,14 @@ router.get('/patients/:patientId/medication-history/overview', authMiddleware, r
 
 // Gói của bệnh nhân (cho người thân)
 router.get('/patients/:patientId/my-package', (req, res, next) => {
-	try {
-		// Log requester info early (before auth) so we see all hits
-		const maybeUser = req.user ? req.user._id : (req.headers && req.headers.authorization ? 'has-token' : 'no-token');
-		console.log(`[route] GET /relative-patient/patients/${req.params.patientId}/my-package called, requester=${maybeUser}`);
-	} catch (e) {
-		console.error('Logging middleware error for my-package route:', e && (e.stack || e.message || e));
-	}
-	next();
+    try {
+        // Log requester info early (before auth) so we see all hits
+        const maybeUser = req.user ? req.user._id : (req.headers && req.headers.authorization ? 'has-token' : 'no-token');
+        console.log(`[route] GET /relative-patient/patients/${req.params.patientId}/my-package called, requester=${maybeUser}`);
+    } catch (e) {
+        console.error('Logging middleware error for my-package route:', e && (e.stack || e.message || e));
+    }
+    next();
 }, authMiddleware, relativePatientController.getPatientActivePackage);
 router.get('/patients/:patientId/check-feature/:feature', authMiddleware, relativePatientController.checkPatientFeatureAccess);
 router.get('/patients/:patientId/my-history', authMiddleware, relativePatientController.getPatientPackageHistory);

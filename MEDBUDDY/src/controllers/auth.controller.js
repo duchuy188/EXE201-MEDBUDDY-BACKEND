@@ -139,36 +139,36 @@ exports.register = async(req, res) => {
         if (existingPhone) {
             return res.status(400).json({ message: 'Phone number already exists.' });
         }
-    // Parse dateOfBirth string to Date object
-    let parsedDateOfBirth;
-    if (typeof dateOfBirth === 'string') {
-      // Handle different date formats
-      if (dateOfBirth.includes('/')) {
-        // Format: DD/MM/YYYY or MM/DD/YYYY
-        const parts = dateOfBirth.split('/');
-        if (parts.length === 3) {
-          // Assume DD/MM/YYYY format
-          const day = parseInt(parts[0]);
-          const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
-          const year = parseInt(parts[2]);
-          parsedDateOfBirth = new Date(year, month, day);
+        // Parse dateOfBirth string to Date object
+        let parsedDateOfBirth;
+        if (typeof dateOfBirth === 'string') {
+            // Handle different date formats
+            if (dateOfBirth.includes('/')) {
+                // Format: DD/MM/YYYY or MM/DD/YYYY
+                const parts = dateOfBirth.split('/');
+                if (parts.length === 3) {
+                    // Assume DD/MM/YYYY format
+                    const day = parseInt(parts[0]);
+                    const month = parseInt(parts[1]) - 1; // JavaScript months are 0-indexed
+                    const year = parseInt(parts[2]);
+                    parsedDateOfBirth = new Date(year, month, day);
+                }
+            } else {
+                // Try to parse as ISO date string
+                parsedDateOfBirth = new Date(dateOfBirth);
+            }
+        } else {
+            parsedDateOfBirth = dateOfBirth;
         }
-      } else {
-        // Try to parse as ISO date string
-        parsedDateOfBirth = new Date(dateOfBirth);
-      }
-    } else {
-      parsedDateOfBirth = dateOfBirth;
-    }
-    
-    // Validate parsed date
-    if (!parsedDateOfBirth || isNaN(parsedDateOfBirth.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format. Please use DD/MM/YYYY format.' });
-    }
-    
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ fullName, email, phoneNumber, password: hashedPassword, role, dateOfBirth: parsedDateOfBirth });
-    await user.save();
+
+        // Validate parsed date
+        if (!parsedDateOfBirth || isNaN(parsedDateOfBirth.getTime())) {
+            return res.status(400).json({ message: 'Invalid date format. Please use DD/MM/YYYY format.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = new User({ fullName, email, phoneNumber, password: hashedPassword, role, dateOfBirth: parsedDateOfBirth });
+        await user.save();
         res.status(201).json({ message: 'Registration successful!' });
 
     } catch (error) {

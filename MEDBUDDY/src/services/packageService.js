@@ -172,8 +172,7 @@ async function reconcileActivePackageFromPaid(userId) {
         userId, {
             activePackage: {
                 packageId: (payments[payments.length - 1].packageId && payments[payments.length - 1].packageId._id) ?
-                    payments[payments.length - 1].packageId._id :
-                    payments[payments.length - 1].packageId,
+                    payments[payments.length - 1].packageId._id : payments[payments.length - 1].packageId,
                 startDate,
                 endDate,
                 features: mergedFeatures,
