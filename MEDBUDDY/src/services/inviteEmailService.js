@@ -1,20 +1,12 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+require('dotenv').config();
 
-// Cấu hình transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Hàm gửi email xác nhận liên kết người thân
 async function sendInviteEmail(toEmail, patientName, relativeName, confirmLink, otpCode) {
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM, // ví dụ: "MedBuddy <noreply@medbuddy.vn>"
     to: toEmail,
     subject: 'HAP MEDBUDDY - Lời mời liên kết người thân',
     html: `
@@ -71,10 +63,10 @@ async function sendInviteEmail(toEmail, patientName, relativeName, confirmLink, 
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log('Invite email sent to:', toEmail);
+    const response = await resend.emails.send(mailOptions);
+    console.log('✅ Invite email sent:', response);
   } catch (error) {
-    console.error('Error sending invite email:', error);
+    console.error('❌ Error sending invite email:', error);
     throw error;
   }
 }
