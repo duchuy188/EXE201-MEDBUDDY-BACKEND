@@ -1,12 +1,50 @@
 const Reminder = require('../models/Reminder');
 const TextToSpeechService = require('../services/textToSpeech.service');
+const Medication = require('../models/Medication');
+
+// Helper: tạo câu nhắc mặc định từ reminder (sử dụng medicationId đã populate nếu có)
+function generateReminderNote(reminder) {
+  try {
+    let medName = 'thuốc';
+    let medForm = 'viên';
+    let remaining = null;
+    if (reminder.medicationId) {
+      const med = reminder.medicationId;
+      if (med.name) medName = med.name;
+      if (med.form) medForm = med.form;
+      if (typeof med.remainingQuantity !== 'undefined' && med.remainingQuantity !== null) remaining = med.remainingQuantity;
+    }
+
+    const defaultDose = 1;
+    let timePhrase = '';
+    if (Array.isArray(reminder.times) && reminder.times.length > 0) {
+      const first = reminder.times[0].time || '';
+      if (first === 'Sáng') timePhrase = 'buổi sáng';
+      else if (first === 'Chiều') timePhrase = 'buổi chiều';
+      else if (first === 'Tối') timePhrase = 'buổi tối';
+      else timePhrase = first;
+    }
+
+    const doseText = `Vui lòng uống ${defaultDose} ${medForm}` + (timePhrase ? ` vào ${timePhrase}` : '') + '.';
+    const remainingText = remaining !== null ? ` Hiện còn ${remaining} ${medForm}.` : '';
+    return `Đã đến giờ uống thuốc ${medName}. ${doseText}${remainingText}`;
+  } catch (e) {
+    return 'Đã đến giờ uống thuốc.';
+  }
+}
 
 // Lấy danh sách nhắc uống thuốc của user
 exports.getReminders = async (req, res) => {
   try {
     const userId = req.user?._id || req.query.userId;
     const reminders = await Reminder.find({ userId }).populate('medicationId');
-    res.json(reminders);
+    // Thay thế các note mặc định cũ bằng câu rõ ràng hơn khi trả về cho client
+    const normalized = reminders.map(r => {
+      const placeholder = !r.note || (typeof r.note === 'string' && r.note.trim() === 'Đã đến giờ uống thuốc rồi');
+      if (placeholder) r.note = generateReminderNote(r);
+      return r;
+    });
+    res.json(normalized);
   } catch (err) {
     res.status(500).json({ message: 'Lỗi server' });
   }
@@ -85,7 +123,46 @@ exports.createReminder = async (req, res) => {
     const reminderStatus = validStatus.includes(status) ? status : 'pending';
 
     const userId = req.user._id;
-    const reminderNote = note || "Đã đến giờ uống thuốc rồi";
+    // Nếu user không truyền note, tạo câu nhắc mặc định chi tiết hơn.
+    // Ví dụ: "Đã đến giờ uống thuốc Huyết áp. Vui lòng uống 1 viên vào buổi sáng. Hiện còn 29 viên."
+    let reminderNote = note;
+    if (!reminderNote) {
+      let medName = 'thuốc';
+      let medForm = 'viên';
+      let remaining = null;
+      // số liều mặc định mỗi lần (nếu model không có thông tin), dùng 1
+      const defaultDose = 1;
+      try {
+        const med = await Medication.findById(medicationId).select('name form remainingQuantity');
+        if (med) {
+          if (med.name) medName = med.name;
+          if (med.form) medForm = med.form;
+          if (typeof med.remainingQuantity !== 'undefined' && med.remainingQuantity !== null) remaining = med.remainingQuantity;
+        }
+      } catch (e) {
+        // Nếu không lấy được medication, giữ fallback
+      }
+
+      // Lấy khung giờ chính (nếu có) -> chuyển Sáng/Chiều/Tối thành 'buổi sáng'...
+      let timePhrase = '';
+      if (Array.isArray(times) && times.length > 0) {
+        const first = times[0].time || '';
+        if (first === 'Sáng') timePhrase = 'buổi sáng';
+        else if (first === 'Chiều') timePhrase = 'buổi chiều';
+        else if (first === 'Tối') timePhrase = 'buổi tối';
+        else timePhrase = first; // fallback: dùng nguyên chuỗi
+      } else if (typeof note === 'string' && /sáng|chiều|tối/i.test(note)) {
+        // cố gắng suy ra từ note (hiếm dùng)
+        const n = note.toLowerCase();
+        if (n.includes('sáng')) timePhrase = 'buổi sáng';
+        else if (n.includes('chiều')) timePhrase = 'buổi chiều';
+        else if (n.includes('tối')) timePhrase = 'buổi tối';
+      }
+
+      const doseText = `Vui lòng uống ${defaultDose} ${medForm}` + (timePhrase ? ` vào ${timePhrase}` : '') + '.';
+      const remainingText = remaining !== null ? ` Hiện còn ${remaining} ${medForm}.` : '';
+      reminderNote = `Đã đến giờ uống thuốc ${medName}. ${doseText}${remainingText}`;
+    }
 
     const reminder = new Reminder({
       userId,
