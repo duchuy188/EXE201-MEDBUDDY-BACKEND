@@ -1464,8 +1464,36 @@ exports.createMedicationsFromOcrForPatient = async(req, res) => {
         if (docs.length > 0) console.log('example doc:', JSON.stringify(docs[0]).slice(0, 1000));
 
         try {
-            const result = await Medication.insertMany(docs, { ordered: false });
-            console.log('createMedicationsFromOcrForPatient: insertMany result count=', Array.isArray(result) ? result.length : 0);
+            // Filter out duplicates trước khi lưu
+            const filteredDocs = [];
+            
+            for (const doc of docs) {
+                // Kiểm tra thuốc trùng trong 5 phút gần đây
+                const existing = await Medication.findOne({
+                    userId: patientId,
+                    name: doc.name,
+                    quantity: doc.quantity,
+                    totalQuantity: doc.totalQuantity,
+                    createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) } // 5 phút
+                });
+                
+                if (!existing) {
+                    filteredDocs.push(doc);
+                } else {
+                    console.log('Duplicate medication found, skipping:', doc.name);
+                }
+            }
+            
+            if (filteredDocs.length === 0) {
+                return res.status(200).json({ 
+                    success: true, 
+                    message: 'Tất cả thuốc đã tồn tại, không cần lưu thêm',
+                    data: [] 
+                });
+            }
+            
+            const result = await Medication.insertMany(filteredDocs, { ordered: false });
+            console.log('createMedicationsFromOcrForPatient: inserted', filteredDocs.length, 'new medications');
             return res.status(201).json({ success: true, data: result });
         } catch (insertErr) {
             console.error('createMedicationsFromOcrForPatient: insertMany error:', insertErr && (insertErr.stack || insertErr.message || insertErr));
@@ -1591,7 +1619,38 @@ exports.createMedicationsFromOcrImageForPatient = async(req, res) => {
             };
         });
 
-        const result = await require('../models/Medication').insertMany(docs);
+        // Filter out duplicates trước khi lưu
+        const filteredDocs = [];
+        
+        for (const doc of docs) {
+            // Kiểm tra thuốc trùng trong 5 phút gần đây
+            const existing = await Medication.findOne({
+                userId: patientId,
+                name: doc.name,
+                quantity: doc.quantity,
+                totalQuantity: doc.totalQuantity,
+                createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) } // 5 phút
+            });
+            
+            if (!existing) {
+                filteredDocs.push(doc);
+            } else {
+                console.log('Duplicate medication found, skipping:', doc.name);
+            }
+        }
+        
+        if (filteredDocs.length === 0) {
+            return res.status(200).json({ 
+                success: true, 
+                message: 'Tất cả thuốc đã tồn tại, không cần lưu thêm',
+                data: [],
+                rawText, 
+                imageUrl 
+            });
+        }
+        
+        const result = await require('../models/Medication').insertMany(filteredDocs);
+        console.log('createMedicationsFromOcrImageForPatient: inserted', filteredDocs.length, 'new medications');
         res.status(201).json({ success: true, data: result, rawText, imageUrl });
     } catch (err) {
         console.error('Error in createMedicationsFromOcrImageForPatient:', err);
