@@ -1,4 +1,4 @@
-const RelativePatient = require('../models/RelativePatient');
+    const RelativePatient = require('../models/RelativePatient');
 const User = require('../models/User');
 const { sendInviteEmail } = require('../services/inviteEmailService');
 const Package = require('../models/Package');
@@ -1421,18 +1421,43 @@ exports.createMedicationsFromOcrForPatient = async(req, res) => {
             return res.status(400).json({ message: 'Danh s e1ch thu f3c kh f4ng h f9p l ed' });
         }
 
-        // Map từng thuốc sang schema Medication
-        const docs = medicines.map(med => ({
-            userId: patientId,
-            name: med.name,
-            form: med.form || '',
-            image: med.image || imageUrl || '',
-            note: med.usage || med.note || rawText || '',
-            quantity: med.quantity || '',
-            times: med.times || [],
-            createdBy: relativeId,
-            createdByType: 'relative'
-        }));
+        
+        const docs = medicines.map(med => {
+          
+            const parsedTotalQuantity = med.totalQuantity || parseInt(med.quantity) || 0;
+            
+            
+            const quantityString = med.quantity || (parsedTotalQuantity ? `${parsedTotalQuantity} viên` : '');
+            
+           
+            const mapTimeValue = (time) => {
+                if (!time) return time;
+                const timeMap = {
+                    'sáng': 'Sáng',
+                    'chiều': 'Chiều', 
+                    'tối': 'Tối'
+                };
+                return timeMap[time.toLowerCase()] || time;
+            };
+            
+            return {
+                userId: patientId,
+                name: med.name,
+                form: med.form || '',
+                image: med.image || imageUrl || '',
+                note: med.usage || med.note || rawText || '',
+                quantity: quantityString,
+                times: (med.times || []).map(t => ({
+                    time: mapTimeValue(t.time),
+                    dosage: t.dosage
+                })),
+                totalQuantity: parsedTotalQuantity,
+                remainingQuantity: parsedTotalQuantity,
+                lowStockThreshold: med.lowStockThreshold || 5,
+                createdBy: relativeId,
+                createdByType: 'relative'
+            };
+        });
 
         // Debug logging to help diagnose why inserts might not persist
         console.log('createMedicationsFromOcrForPatient: inserting docs count=', docs.length);
@@ -1528,18 +1553,43 @@ exports.createMedicationsFromOcrImageForPatient = async(req, res) => {
             return res.status(400).json({ message: 'Không nhận diện được thuốc từ ảnh', rawText, imageUrl });
         }
 
-        // Map and save medicines using existing Medication schema
-        const docs = medicines.map(med => ({
-            userId: patientId,
-            name: med.name,
-            form: med.form || '',
-            image: med.image || imageUrl || '',
-            note: med.usage || med.note || rawText || '',
-            quantity: med.quantity || '',
-            times: med.times || [],
-            createdBy: relativeId,
-            createdByType: 'relative'
-        }));
+        
+        const docs = medicines.map(med => {
+            
+            const parsedTotalQuantity = med.totalQuantity || parseInt(med.quantity) || 0;
+            
+            
+            const quantityString = med.quantity || (parsedTotalQuantity ? `${parsedTotalQuantity} viên` : '');
+            
+           
+            const mapTimeValue = (time) => {
+                if (!time) return time;
+                const timeMap = {
+                    'sáng': 'Sáng',
+                    'chiều': 'Chiều', 
+                    'tối': 'Tối'
+                };
+                return timeMap[time.toLowerCase()] || time;
+            };
+            
+            return {
+                userId: patientId,
+                name: med.name,
+                form: med.form || '',
+                image: med.image || imageUrl || '',
+                note: med.usage || med.note || rawText || '',
+                quantity: quantityString,
+                times: (med.times || []).map(t => ({
+                    time: mapTimeValue(t.time),
+                    dosage: t.dosage
+                })),
+                totalQuantity: parsedTotalQuantity,
+                remainingQuantity: parsedTotalQuantity,
+                lowStockThreshold: med.lowStockThreshold || 5,
+                createdBy: relativeId,
+                createdByType: 'relative'
+            };
+        });
 
         const result = await require('../models/Medication').insertMany(docs);
         res.status(201).json({ success: true, data: result, rawText, imageUrl });
