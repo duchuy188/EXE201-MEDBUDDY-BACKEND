@@ -7,16 +7,42 @@ exports.createMedicationsFromOcr = async (req, res) => {
       return res.status(400).json({ message: 'Danh sách thuốc không hợp lệ' });
     }
     // Map từng thuốc sang schema Medication
-    const docs = medicines.map(med => ({
-      userId,
-      name: med.name,
-      form: med.form || '',
-      image: imageUrl || '',
-      note: med.usage || med.note || '',
-      quantity: med.quantity || '', // tổng số lượng thuốc
-      times: med.times || [] // mảng các buổi uống và liều lượng
-      // Có thể lưu rawText vào note hoặc trường riêng nếu muốn
-    }));
+    const docs = medicines.map(med => {
+      
+      const parsedTotalQuantity = med.totalQuantity || parseInt(med.quantity) || 0;
+      
+     
+      
+      const quantityString = med.quantity || (parsedTotalQuantity ? `${parsedTotalQuantity} viên` : '');
+      
+     
+      const mapTimeValue = (time) => {
+        if (!time) return time;
+        const timeMap = {
+          'sáng': 'Sáng',
+          'chiều': 'Chiều', 
+          'tối': 'Tối'
+        };
+        return timeMap[time.toLowerCase()] || time;
+      };
+
+      return {
+        userId,
+        name: med.name,
+        form: med.form || '',
+        image: imageUrl || '',
+        note: med.usage || med.note || '',
+        quantity: quantityString, 
+        times: (med.times || []).map(t => ({
+          time: mapTimeValue(t.time),
+          dosage: t.dosage
+        })), 
+        totalQuantity: parsedTotalQuantity,
+        remainingQuantity: parsedTotalQuantity,
+        lowStockThreshold: med.lowStockThreshold || 5
+       
+      };
+    });
     const result = await require('../models/Medication').insertMany(docs);
     res.status(201).json(result);
   } catch (err) {
