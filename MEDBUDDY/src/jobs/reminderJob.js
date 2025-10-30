@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const Reminder = require('../models/Reminder');
 const MedicationHistory = require('../models/MedicationHistory');
+const { createSafeMedicationHistory } = require('../services/medicationHistorySafe.service');
 const fcmService = require('../services/fcmService');
 
 // Job chạy mỗi phút
@@ -35,7 +36,7 @@ cron.schedule('* * * * *', async () => {
         });
 
         if (!existingHistory) {
-          await MedicationHistory.create({
+          await createSafeMedicationHistory({
             userId: reminder.userId,
             medicationId: reminder.medicationId,
             reminderId: reminder._id,

@@ -226,27 +226,28 @@ exports.updateReminder = async (req, res) => {
       if (updateToday) {
         const today = new Date().toISOString().slice(0, 10);
         const MedicationHistory = require('../models/MedicationHistory');
+        const { createSafeMedicationHistory } = require('../services/medicationHistorySafe.service');
 
-        // Xóa MedicationHistory cũ của hôm nay (chỉ những cái pending)
-        await MedicationHistory.deleteMany({
-          reminderId: currentReminder._id,
-          date: today,
-          status: 'pending'
-        });
-
-        // Tạo MedicationHistory mới theo giờ mới
-        for (const rt of repeatTimes) {
-          await MedicationHistory.create({
-            userId: currentReminder.userId,
-            medicationId: currentReminder.medicationId,
+          // Xóa MedicationHistory cũ của hôm nay (chỉ những cái pending)
+          await MedicationHistory.deleteMany({
             reminderId: currentReminder._id,
             date: today,
-            time: rt.time,
-            taken: false,
             status: 'pending'
           });
-        }
-        console.log(`[UPDATE] Đã cập nhật MedicationHistory cho ngày ${today}`);
+
+          // Tạo MedicationHistory mới theo giờ mới (safe)
+          for (const rt of repeatTimes) {
+            await createSafeMedicationHistory({
+              userId: currentReminder.userId,
+              medicationId: currentReminder.medicationId,
+              reminderId: currentReminder._id,
+              date: today,
+              time: rt.time,
+              taken: false,
+              status: 'pending'
+            });
+          }
+          console.log(`[UPDATE] Đã cập nhật MedicationHistory cho ngày ${today}`);
       }
     }
 

@@ -1,5 +1,6 @@
 const Reminder = require('../models/Reminder');
 const MedicationHistory = require('../models/MedicationHistory');
+const { createSafeMedicationHistory } = require('../services/medicationHistorySafe.service');
 const MedicationQuantityService = require('../services/medicationQuantity.service');
 
 // Helper function để cộng phút vào thời gian HH:mm
@@ -105,7 +106,7 @@ exports.updateReminderStatus = async (req, res) => {
     });
 
     if (!history) {
-      history = await MedicationHistory.create({
+      history = await createSafeMedicationHistory({
         userId: reminder.userId,
         medicationId: reminder.medicationId,
         reminderId: reminder._id,
@@ -113,7 +114,7 @@ exports.updateReminderStatus = async (req, res) => {
         time: time,
         taken: false,
         status: 'pending'
-      });
+      }) || null;
     }
 
     // Kiểm tra trạng thái hiện tại trước khi thực hiện action

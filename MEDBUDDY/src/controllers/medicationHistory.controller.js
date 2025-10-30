@@ -1,10 +1,11 @@
 const MedicationHistory = require('../models/MedicationHistory');
+const { createSafeMedicationHistory } = require('../services/medicationHistorySafe.service');
 
 // Tạo lịch sử uống thuốc mới
 exports.createHistory = async (req, res) => {
   try {
     const { userId, medicationId, reminderId, date, time, taken, takenAt, status } = req.body;
-    const history = new MedicationHistory({
+    const created = await createSafeMedicationHistory({
       userId,
       medicationId,
       reminderId,
@@ -12,10 +13,12 @@ exports.createHistory = async (req, res) => {
       time,
       taken: taken || false,
       takenAt,
-      status: status || 'missed',
+      status: status || 'missed'
     });
-    await history.save();
-    res.status(201).json(history);
+    if (!created) {
+      return res.status(400).json({ message: 'Không thể tạo MedicationHistory (thiếu userId hoặc lỗi DB)' });
+    }
+    res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

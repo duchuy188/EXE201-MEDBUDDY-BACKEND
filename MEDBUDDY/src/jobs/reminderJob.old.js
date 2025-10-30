@@ -20,7 +20,8 @@ cron.schedule('* * * * *', async () => {
       isActive: true,
     }).populate('userId');
 
-    const MedicationHistory = require('../models/MedicationHistory');
+  const MedicationHistory = require('../models/MedicationHistory');
+  const { createSafeMedicationHistory } = require('../services/medicationHistorySafe.service');
 
     // Tạo MedicationHistory records cho ngày hôm nay nếu chưa có
     for (const reminder of reminders) {
@@ -33,8 +34,8 @@ cron.schedule('* * * * *', async () => {
         });
 
         if (!existingHistory) {
-          // Create new MedicationHistory record for today
-          await MedicationHistory.create({
+          // Create new MedicationHistory record for today (safe)
+          await createSafeMedicationHistory({
             userId: reminder.userId,
             medicationId: reminder.medicationId,
             reminderId: reminder._id,
